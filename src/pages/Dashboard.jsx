@@ -1,146 +1,150 @@
 import { useState } from "react";
 import BookingModal from "../components/BookingModal";
 
-const RECOMMENDED_TUTORS = [
-  {
-    id: 1, name: "Tanvir Khan", university: "IIT Bombay", year: "CS 3rd Year",
-    rating: 4.9, sessions: 87, rate: 0,
-    skills: ["React", "Node.js", "TypeScript"], primarySkill: "Web Dev",
-    bio: "Full-stack dev specializing in React & Node. I'll teach you to build real projects, not just tutorials.",
-    matchScore: 98, isOnline: true,
-    avatarGrad: "linear-gradient(135deg, #6C63FF, #A89BFF)"
-  },
-  {
-    id: 2, name: "Aisha Patel", university: "BITS Pilani", year: "AI/ML 4th Year",
-    rating: 4.8, sessions: 62, rate: 150,
-    skills: ["ML/AI", "Python", "Data Science"], primarySkill: "ML/AI",
-    bio: "NLP researcher. I make machine learning click through intuition, not just math.",
-    matchScore: 94, isOnline: true,
-    avatarGrad: "linear-gradient(135deg, #FF6584, #FFB347)"
-  },
-  {
-    id: 3, name: "Dev Mehta", university: "NIT Surathkal", year: "CS 2nd Year",
-    rating: 4.7, sessions: 34, rate: 100,
-    skills: ["UI/UX", "Design", "Figma"], primarySkill: "Design",
-    bio: "Product designer who cracked Figma from scratch. I'll take you from wireframe to pixel-perfect in weeks.",
-    matchScore: 89, isOnline: false,
-    avatarGrad: "linear-gradient(135deg, #43D9AD, #4ADE80)"
-  },
+const MY_PROFILE = { teaches:["Java","DSA"], wants:["UI/UX","Figma"] };
+
+const ALL_TUTORS = [
+  { id:1, name:"Priya Nair",  university:"IIT Delhi",     year:"Design 3rd Year", rating:4.8, reviews:45, sessions:45, rate:0,   teaches:["UI/UX","Figma","Design"], wants:["Java","DSA"],      bio:"Designer happy to swap Figma for Java.", isOnline:true,  avatarGrad:"linear-gradient(135deg,#EC4899,#F97316)", initials:"PN" },
+  { id:2, name:"Dev Mehta",   university:"NIT Surathkal", year:"CS 2nd Year",     rating:4.7, reviews:34, sessions:34, rate:0,   teaches:["UI/UX","Figma"],         wants:["Node.js","React"],  bio:"Product designer. Swap Figma for web dev.", isOnline:false, avatarGrad:"linear-gradient(135deg,#10B981,#4ADE80)", initials:"DM" },
+  { id:3, name:"Tanvir Khan", university:"IIT Bombay",    year:"CS 3rd Year",     rating:4.9, reviews:87, sessions:87, rate:150, teaches:["React","Node.js"],       wants:["Python","ML/AI"],   bio:"Full-stack dev. Teach React & Node.",      isOnline:true,  avatarGrad:"linear-gradient(135deg,#6C63FF,#A89BFF)", initials:"TK" },
+  { id:4, name:"Sanya Gupta", university:"IIIT Hyderabad",year:"CS 4th Year",     rating:4.9, reviews:120,sessions:120,rate:200, teaches:["Java","DSA"],            wants:["ML/AI","Python"],   bio:"Google intern. Java & DSA expert.",        isOnline:true,  avatarGrad:"linear-gradient(135deg,#3B82F6,#8B5CF6)", initials:"SG" },
 ];
 
-const MY_SESSIONS = [
-  { tutor: "Tanvir Khan", skill: "React", time: "Today, 4:00 PM", status: "upcoming", avatar: "TK", grad: "linear-gradient(135deg, #6C63FF, #A89BFF)" },
-  { tutor: "Aisha Patel", skill: "Python ML", time: "Tomorrow, 2:00 PM", status: "upcoming", avatar: "AP", grad: "linear-gradient(135deg, #FF6584, #FFB347)" },
-  { tutor: "Rohan Das", skill: "DSA", time: "Yesterday, 6:00 PM", status: "completed", avatar: "RD", grad: "linear-gradient(135deg, #3B82F6, #06B6D4)" },
+function computeMatch(t)  { const a=t.teaches.filter(s=>MY_PROFILE.wants.includes(s)).length, b=t.wants.filter(s=>MY_PROFILE.teaches.includes(s)).length; return Math.min(100,Math.round((a+b)/Math.max(MY_PROFILE.wants.length,1)*100)); }
+function isBarter(t)      { return t.teaches.some(s=>MY_PROFILE.wants.includes(s)) && t.wants.some(s=>MY_PROFILE.teaches.includes(s)); }
+function recommendScore(t){ return computeMatch(t)*0.4 + (t.rating/5)*100*0.3 + Math.min(t.sessions/150*100,100)*0.2 + (t.isOnline?10:0); }
+
+const SESSIONS = [
+  { tutor:"Priya Nair",  skill:"UI/UX Design", time:"Today, 4:00 PM",    status:"upcoming", initials:"PN", grad:"linear-gradient(135deg,#EC4899,#F97316)", barter:true },
+  { tutor:"Dev Mehta",   skill:"Figma",         time:"Tomorrow, 2:00 PM", status:"upcoming", initials:"DM", grad:"linear-gradient(135deg,#10B981,#4ADE80)", barter:true },
+  { tutor:"Tanvir Khan", skill:"React",         time:"Yesterday, 6:00 PM",status:"done",     initials:"TK", grad:"linear-gradient(135deg,#6C63FF,#A89BFF)", barter:false },
 ];
 
-const SKILL_PROGRESS = [
-  { name: "React", progress: 72, color: "#6C63FF" },
-  { name: "Node.js", progress: 55, color: "#10B981" },
-  { name: "Python", progress: 88, color: "#3B82F6" },
-  { name: "UI/UX", progress: 40, color: "#EC4899" },
-];
+function Avatar({ grad, initials, size=46 }) {
+  return (
+    <div style={{ width:size, height:size, borderRadius:"50%", background:grad, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Space Grotesk',sans-serif", fontWeight:700, fontSize:size*0.28, color:"white", flexShrink:0 }}>{initials}</div>
+  );
+}
 
 export default function Dashboard({ navigate }) {
   const [bookingTutor, setBookingTutor] = useState(null);
 
+  const sorted = [...ALL_TUTORS]
+    .map(t=>({...t, match:computeMatch(t), barter:isBarter(t), rec:recommendScore(t)}))
+    .sort((a,b)=>b.rec-a.rec);
+
   return (
-    <div style={{ minHeight: "100vh", background: "#F8F7FF", padding: "32px 0" }}>
-      <div className="container">
-        {/* Welcome header */}
-        <div style={{ marginBottom: 32, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+    <div style={{ background:"#F3F4F6", minHeight:"100vh", fontFamily:"'Inter',sans-serif", padding:"32px 0" }}>
+      <div style={{ maxWidth:1200, margin:"0 auto", padding:"0 24px" }}>
+
+        {/* Header */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:28 }}>
           <div>
-            <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 4 }}>Good afternoon 👋</p>
-            <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 28, fontWeight: 700, color: "var(--text-primary)" }}>
-              Welcome back, Alex
-            </h1>
+            <p style={{ fontSize:13, color:"#9CA3AF", marginBottom:2 }}>Good afternoon 👋</p>
+            <h1 style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:26, fontWeight:800, color:"#111827" }}>Welcome back, Alex</h1>
           </div>
-          <button onClick={() => navigate("explore")} className="btn btn-primary">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
-            Find a Tutor
+          <button onClick={()=>navigate("explore")} style={{ padding:"10px 22px", background:"linear-gradient(135deg,#6C63FF,#4F46E5)", color:"white", border:"none", borderRadius:99, fontSize:14, fontWeight:600, cursor:"pointer" }}>
+            🔍 Find a Match
           </button>
         </div>
 
-        {/* Stats row */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 32 }}>
-          {[
-            { label: "Sessions Completed", value: "24", icon: "✅", delta: "+3 this week" },
-            { label: "Skills Learning", value: "4", icon: "📚", delta: "+1 this month" },
-            { label: "Credits Earned", value: "180", icon: "💎", delta: "From teaching" },
-            { label: "Avg. Session Rating", value: "4.8★", icon: "⭐", delta: "Top 10%" },
-          ].map(s => (
-            <div key={s.label} style={{
-              background: "white", borderRadius: 14,
-              padding: "20px", border: "1px solid var(--border)"
-            }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>{s.label}</p>
-                <span style={{ fontSize: 20 }}>{s.icon}</span>
+        {/* Barter profile banner */}
+        <div style={{ background:"linear-gradient(135deg,#EEF2FF,#E0E7FF)", borderRadius:14, padding:"16px 22px", marginBottom:24, border:"1px solid #C7D2FE", display:"flex", alignItems:"center", gap:24, flexWrap:"wrap" }}>
+          <div style={{ flex:1 }}>
+            <p style={{ fontSize:12, fontWeight:700, color:"#4338CA", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:8 }}>⚡ Your Barter Profile</p>
+            <div style={{ display:"flex", gap:24 }}>
+              <div>
+                <p style={{ fontSize:11, color:"#6B7280", marginBottom:4 }}>You Teach:</p>
+                <div style={{ display:"flex", gap:5 }}>
+                  {MY_PROFILE.teaches.map(s=><span key={s} style={{ padding:"3px 10px", background:"#EEF2FF", color:"#4338CA", borderRadius:99, fontSize:11, fontWeight:600, border:"1px solid #C7D2FE" }}>⚡ {s}</span>)}
+                </div>
               </div>
-              <p style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, fontWeight: 700, color: "var(--text-primary)", marginBottom: 4 }}>
-                {s.value}
-              </p>
-              <p style={{ fontSize: 11, color: "#10B981", fontWeight: 600 }}>{s.delta}</p>
+              <div>
+                <p style={{ fontSize:11, color:"#6B7280", marginBottom:4 }}>You Want to Learn:</p>
+                <div style={{ display:"flex", gap:5 }}>
+                  {MY_PROFILE.wants.map(s=><span key={s} style={{ padding:"3px 10px", background:"#ECFDF5", color:"#059669", borderRadius:99, fontSize:11, fontWeight:600, border:"1px solid #BBF7D0" }}>✓ {s}</span>)}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style={{ textAlign:"center", background:"white", padding:"12px 20px", borderRadius:12, border:"1px solid #C7D2FE" }}>
+            <p style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:24, fontWeight:800, color:"#059669" }}>{sorted.filter(t=>t.barter).length}</p>
+            <p style={{ fontSize:11, color:"#6B7280" }}>Free barter matches</p>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:16, marginBottom:28 }}>
+          {[
+            { label:"Sessions Done",   value:"24",  icon:"✅", delta:"+3 this week",  color:"#EEF2FF" },
+            { label:"Skills Learning", value:"2",   icon:"📚", delta:"UI/UX + Figma", color:"#ECFDF5" },
+            { label:"Free Matches",    value:"2",   icon:"🔄", delta:"Barter ready",  color:"#FEF3C7" },
+            { label:"Avg. Rating",     value:"4.8★",icon:"⭐", delta:"Top 10%",       color:"#FDF2F8" },
+          ].map(s=>(
+            <div key={s.label} style={{ background:"white", borderRadius:14, padding:"18px 16px", border:"1px solid #F3F4F6", boxShadow:"0 1px 6px rgba(0,0,0,0.04)" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
+                <p style={{ fontSize:12, color:"#9CA3AF" }}>{s.label}</p>
+                <div style={{ width:32, height:32, borderRadius:8, background:s.color, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>{s.icon}</div>
+              </div>
+              <p style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:24, fontWeight:800, color:"#111827", marginBottom:2 }}>{s.value}</p>
+              <p style={{ fontSize:11, color:"#10B981", fontWeight:600 }}>{s.delta}</p>
             </div>
           ))}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 24 }}>
-          {/* Main content */}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 320px", gap:24 }}>
+          {/* Main */}
           <div>
-            {/* AI Recommended Tutors */}
-            <div style={{
-              background: "white", borderRadius: 16,
-              border: "1px solid var(--border)", padding: 24, marginBottom: 24
-            }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+            {/* AI Recommended */}
+            <div style={{ background:"white", borderRadius:16, border:"1px solid #F3F4F6", padding:22, marginBottom:22 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
                 <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontSize: 16 }}>🤖</span>
-                    <p style={{ fontSize: 12, fontWeight: 700, color: "var(--primary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                      AI Recommendations
-                    </p>
+                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:2 }}>
+                    <span style={{ fontSize:16 }}>🤖</span>
+                    <p style={{ fontSize:11, fontWeight:700, color:"#6C63FF", textTransform:"uppercase", letterSpacing:"0.06em" }}>AI Recommendations</p>
                   </div>
-                  <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 18, fontWeight: 700 }}>
-                    Top tutors for you
-                  </h2>
+                  <h2 style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:17, fontWeight:700, color:"#111827" }}>Best matches for you</h2>
                 </div>
-                <button onClick={() => navigate("explore")} style={{
-                  fontSize: 13, color: "var(--primary)", fontWeight: 600,
-                  background: "none", border: "none", cursor: "pointer"
-                }}>View all →</button>
+                <button onClick={()=>navigate("explore")} style={{ fontSize:13, color:"#6C63FF", fontWeight:600, background:"none", border:"none", cursor:"pointer" }}>View all →</button>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {RECOMMENDED_TUTORS.map(tutor => (
-                  <TutorRow key={tutor.id} tutor={tutor} onBook={() => setBookingTutor(tutor)} />
-                ))}
-              </div>
-            </div>
-
-            {/* Skill Progress */}
-            <div style={{
-              background: "white", borderRadius: 16,
-              border: "1px solid var(--border)", padding: 24
-            }}>
-              <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 20 }}>
-                My Skill Progress
-              </h2>
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                {SKILL_PROGRESS.map(skill => (
-                  <div key={skill.name}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{skill.name}</span>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: skill.color }}>{skill.progress}%</span>
+              <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                {sorted.map(tutor=>(
+                  <div key={tutor.id} style={{
+                    display:"flex", alignItems:"center", gap:14,
+                    padding:"14px", borderRadius:12,
+                    border:`1.5px solid ${tutor.barter?"#BBF7D0":"#F3F4F6"}`,
+                    background:tutor.barter?"#FAFFFE":"white",
+                    transition:"all 0.2s", cursor:"pointer"
+                  }}
+                  onMouseEnter={e=>{ e.currentTarget.style.borderColor="#6C63FF"; e.currentTarget.style.background="#FAFAFE"; }}
+                  onMouseLeave={e=>{ e.currentTarget.style.borderColor=tutor.barter?"#BBF7D0":"#F3F4F6"; e.currentTarget.style.background=tutor.barter?"#FAFFFE":"white"; }}
+                  >
+                    <div style={{ position:"relative" }}>
+                      <Avatar grad={tutor.avatarGrad} initials={tutor.initials} size={46}/>
+                      {tutor.isOnline && <span style={{ position:"absolute", bottom:1, right:1, width:11, height:11, borderRadius:"50%", background:"#10B981", border:"2px solid white" }}/>}
                     </div>
-                    <div style={{ height: 8, background: "#F3F0FF", borderRadius: 4, overflow: "hidden" }}>
-                      <div style={{
-                        height: "100%", width: `${skill.progress}%`,
-                        background: skill.color, borderRadius: 4,
-                        transition: "width 1s ease"
-                      }}/>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:2 }}>
+                        <p style={{ fontWeight:700, fontSize:14, color:"#111827" }}>{tutor.name}</p>
+                        {tutor.barter && <span style={{ padding:"2px 8px", background:"#ECFDF5", color:"#059669", borderRadius:99, fontSize:10, fontWeight:700, border:"1px solid #BBF7D0" }}>🔄 Free Barter</span>}
+                        {tutor.match>0 && <span style={{ padding:"2px 8px", background:"#EEF2FF", color:"#4338CA", borderRadius:99, fontSize:10, fontWeight:700 }}>{tutor.match}% match</span>}
+                      </div>
+                      <p style={{ fontSize:12, color:"#9CA3AF", marginBottom:4 }}>{tutor.university} · {tutor.year}</p>
+                      <div style={{ display:"flex", gap:4, flexWrap:"wrap" }}>
+                        {tutor.teaches.slice(0,2).map(s=>(
+                          <span key={s} style={{ padding:"2px 8px", background:MY_PROFILE.wants.includes(s)?"#ECFDF5":"#F3F4F6", color:MY_PROFILE.wants.includes(s)?"#059669":"#374151", borderRadius:99, fontSize:10, fontWeight:500 }}>{MY_PROFILE.wants.includes(s)?"✓ ":""}{s}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ textAlign:"right", flexShrink:0 }}>
+                      <p style={{ fontSize:11, color:"#9CA3AF", marginBottom:2 }}>⭐ {tutor.rating}</p>
+                      <p style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:15, fontWeight:800, color:tutor.barter?"#059669":"#6C63FF", marginBottom:6 }}>
+                        {tutor.barter ? "FREE" : tutor.rate===0?"FREE":`$${tutor.rate}/hr`}
+                      </p>
+                      <button onClick={e=>{e.stopPropagation();setBookingTutor(tutor);}} style={{ padding:"6px 14px", background:tutor.barter?"#059669":"#6C63FF", color:"white", border:"none", borderRadius:99, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                        {tutor.barter?"🔄 Barter":"📅 Book"}
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -149,154 +153,48 @@ export default function Dashboard({ navigate }) {
           </div>
 
           {/* Sidebar */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            {/* Upcoming Sessions */}
-            <div style={{ background: "white", borderRadius: 16, border: "1px solid var(--border)", padding: 24 }}>
-              <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
-                📅 My Sessions
-              </h2>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {MY_SESSIONS.map((s, i) => (
-                  <div key={i} style={{
-                    display: "flex", alignItems: "center", gap: 12,
-                    padding: "12px", background: s.status === "upcoming" ? "#F8F7FF" : "white",
-                    borderRadius: 10, border: "1px solid var(--border)"
-                  }}>
-                    <div className="avatar" style={{ width: 36, height: 36, fontSize: 12, background: s.grad }}>
-                      {s.avatar}
+          <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
+            {/* Sessions */}
+            <div style={{ background:"white", borderRadius:16, border:"1px solid #F3F4F6", padding:20 }}>
+              <h2 style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:15, fontWeight:700, color:"#111827", marginBottom:14 }}>📅 My Sessions</h2>
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                {SESSIONS.map((s,i)=>(
+                  <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:10, background:s.status==="upcoming"?"#F8F7FF":"white", borderRadius:10, border:"1px solid #F3F4F6" }}>
+                    <Avatar grad={s.grad} initials={s.initials} size={34}/>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <p style={{ fontSize:13, fontWeight:600, color:"#111827" }}>{s.tutor}</p>
+                      <p style={{ fontSize:11, color:"#9CA3AF" }}>{s.skill} · {s.time}</p>
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{s.tutor}</p>
-                      <p style={{ fontSize: 11, color: "var(--text-muted)" }}>{s.skill} · {s.time}</p>
-                    </div>
-                    {s.status === "upcoming" ? (
-                      <button style={{
-                        padding: "4px 10px",
-                        background: "#6C63FF", color: "white",
-                        border: "none", borderRadius: 99,
-                        fontSize: 11, fontWeight: 600, cursor: "pointer"
-                      }}>
-                        🎥 Join
-                      </button>
-                    ) : (
-                      <span style={{
-                        padding: "4px 10px", background: "#F3F4F6",
-                        color: "#6B7280", borderRadius: 99,
-                        fontSize: 11, fontWeight: 500
-                      }}>Done</span>
-                    )}
+                    {s.status==="upcoming"
+                      ? <button style={{ padding:"4px 10px", background:"#6C63FF", color:"white", border:"none", borderRadius:99, fontSize:11, fontWeight:600, cursor:"pointer" }}>🎥 Join</button>
+                      : <span style={{ fontSize:11, color:"#9CA3AF", fontWeight:500 }}>Done</span>
+                    }
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Credits card */}
-            <div style={{
-              background: "linear-gradient(135deg, #6C63FF, #4B44CC)",
-              borderRadius: 16, padding: 24, color: "white"
-            }}>
-              <p style={{ fontSize: 12, opacity: 0.7, marginBottom: 4 }}>SkillBridge Credits</p>
-              <p style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 32, fontWeight: 800, marginBottom: 4 }}>
-                180 <span style={{ fontSize: 20 }}>💎</span>
-              </p>
-              <p style={{ fontSize: 12, opacity: 0.7, marginBottom: 20 }}>Earned by teaching peers</p>
-              <button style={{
-                width: "100%", padding: "10px",
-                background: "rgba(255,255,255,0.2)",
-                color: "white", border: "1px solid rgba(255,255,255,0.3)",
-                borderRadius: 99, fontSize: 13, fontWeight: 600,
-                cursor: "pointer"
-              }}>Use credits to book sessions</button>
+            {/* Barter status */}
+            <div style={{ background:"linear-gradient(135deg,#059669,#10B981)", borderRadius:16, padding:22, color:"white" }}>
+              <p style={{ fontSize:12, opacity:0.8, marginBottom:4 }}>Barter Status</p>
+              <p style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:28, fontWeight:800, marginBottom:4 }}>2 Free <span style={{ fontSize:20 }}>🔄</span></p>
+              <p style={{ fontSize:12, opacity:0.8, marginBottom:18 }}>Skill exchange matches ready</p>
+              <button onClick={()=>navigate("explore")} style={{ width:"100%", padding:10, background:"rgba(255,255,255,0.2)", color:"white", border:"1px solid rgba(255,255,255,0.3)", borderRadius:99, fontSize:13, fontWeight:600, cursor:"pointer" }}>
+                View all barter matches
+              </button>
             </div>
 
-            {/* Post a skill you can teach */}
-            <div style={{
-              background: "#ECFDF5", borderRadius: 16,
-              border: "1px solid #BBF7D0", padding: 24
-            }}>
-              <p style={{ fontSize: 13, fontWeight: 700, color: "#065F46", marginBottom: 6 }}>
-                🎓 Start Teaching
-              </p>
-              <p style={{ fontSize: 13, color: "#047857", marginBottom: 16, lineHeight: 1.5 }}>
-                Share a skill you know and earn credits to spend on your own learning.
-              </p>
-              <button style={{
-                width: "100%", padding: "10px",
-                background: "#10B981", color: "white",
-                border: "none", borderRadius: 99,
-                fontSize: 13, fontWeight: 600, cursor: "pointer"
-              }}>
-                + Add a skill to teach
-              </button>
+            {/* Teach & earn */}
+            <div style={{ background:"#FFFBEB", borderRadius:16, border:"1px solid #FDE68A", padding:20 }}>
+              <p style={{ fontSize:13, fontWeight:700, color:"#92400E", marginBottom:6 }}>🎓 Expand your barter profile</p>
+              <p style={{ fontSize:13, color:"#B45309", marginBottom:14, lineHeight:1.5 }}>Add more skills you can teach to unlock more free barter matches.</p>
+              <button style={{ width:"100%", padding:10, background:"#F59E0B", color:"white", border:"none", borderRadius:99, fontSize:13, fontWeight:600, cursor:"pointer" }}>+ Add a skill</button>
             </div>
           </div>
         </div>
       </div>
 
-      {bookingTutor && (
-        <BookingModal tutor={bookingTutor} onClose={() => setBookingTutor(null)} />
-      )}
-    </div>
-  );
-}
-
-function TutorRow({ tutor, onBook }) {
-  return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 14,
-      padding: "14px", borderRadius: 12,
-      border: "1px solid var(--border)",
-      transition: "all 0.2s", cursor: "pointer",
-      background: "white"
-    }}
-    onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--primary)"; e.currentTarget.style.background = "#FAFAFE"; }}
-    onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "white"; }}
-    >
-      <div className="avatar" style={{ width: 48, height: 48, fontSize: 16, background: tutor.avatarGrad, position: "relative" }}>
-        {tutor.name[0]}
-        {tutor.isOnline && (
-          <span style={{
-            position: "absolute", bottom: 0, right: 0,
-            width: 12, height: 12, borderRadius: "50%",
-            background: "#10B981", border: "2px solid white"
-          }}/>
-        )}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-          <p style={{ fontWeight: 600, fontSize: 14 }}>{tutor.name}</p>
-          {tutor.matchScore >= 90 && (
-            <span style={{
-              padding: "2px 8px", background: "#ECFDF5",
-              color: "#065F46", borderRadius: 99,
-              fontSize: 10, fontWeight: 700
-            }}>{tutor.matchScore}% match</span>
-          )}
-        </div>
-        <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
-          {tutor.university} · {tutor.year}
-        </p>
-        <div style={{ display: "flex", gap: 4 }}>
-          {tutor.skills.slice(0, 2).map(s => (
-            <span key={s} style={{
-              padding: "2px 8px", background: "var(--primary-bg)",
-              color: "var(--primary-dark)", borderRadius: 99,
-              fontSize: 10, fontWeight: 500
-            }}>{s}</span>
-          ))}
-        </div>
-      </div>
-      <div style={{ textAlign: "right" }}>
-        <p style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 15, color: "var(--primary)" }}>
-          {tutor.rate === 0 ? "Free" : `$${tutor.rate}/hr`}
-        </p>
-        <div style={{ color: "#FFB347", fontSize: 11, marginBottom: 6 }}>{"★".repeat(Math.floor(tutor.rating))}</div>
-        <button onClick={e => { e.stopPropagation(); onBook(); }} style={{
-          padding: "6px 14px", background: "var(--primary)",
-          color: "white", border: "none", borderRadius: 99,
-          fontSize: 12, fontWeight: 600, cursor: "pointer"
-        }}>Book</button>
-      </div>
+      {bookingTutor && <BookingModal tutor={bookingTutor} onClose={()=>setBookingTutor(null)}/>}
     </div>
   );
 }
