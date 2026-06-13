@@ -4,10 +4,10 @@ import BookingModal from "../components/BookingModal";
 const MY_PROFILE = { teaches:["Java","DSA"], wants:["UI/UX","Figma"] };
 
 const ALL_TUTORS = [
-  { id:1, name:"Priya Nair",  university:"IIT Delhi",     year:"Design 3rd Year", rating:4.8, reviews:45, sessions:45, rate:0,   teaches:["UI/UX","Figma","Design"], wants:["Java","DSA"],      bio:"Designer happy to swap Figma for Java.", isOnline:true,  avatarGrad:"linear-gradient(135deg,#EC4899,#F97316)", initials:"PN" },
-  { id:2, name:"Dev Mehta",   university:"NIT Surathkal", year:"CS 2nd Year",     rating:4.7, reviews:34, sessions:34, rate:0,   teaches:["UI/UX","Figma"],         wants:["Node.js","React"],  bio:"Product designer. Swap Figma for web dev.", isOnline:false, avatarGrad:"linear-gradient(135deg,#10B981,#4ADE80)", initials:"DM" },
-  { id:3, name:"Tanvir Khan", university:"IIT Bombay",    year:"CS 3rd Year",     rating:4.9, reviews:87, sessions:87, rate:150, teaches:["React","Node.js"],       wants:["Python","ML/AI"],   bio:"Full-stack dev. Teach React & Node.",      isOnline:true,  avatarGrad:"linear-gradient(135deg,#6C63FF,#A89BFF)", initials:"TK" },
-  { id:4, name:"Sanya Gupta", university:"IIIT Hyderabad",year:"CS 4th Year",     rating:4.9, reviews:120,sessions:120,rate:200, teaches:["Java","DSA"],            wants:["ML/AI","Python"],   bio:"Google intern. Java & DSA expert.",        isOnline:true,  avatarGrad:"linear-gradient(135deg,#3B82F6,#8B5CF6)", initials:"SG" },
+  { id:1, name:"Priya mahaju",  university:"KU Dhulikhel", year:"Design 3rd Year", rating:4.8, reviews:45, sessions:45, rate:0,   teaches:["UI/UX","Figma","Design"], wants:["Java","DSA"],      bio:"Designer happy to swap Figma for Java.", isOnline:true,  avatarGrad:"linear-gradient(135deg,#EC4899,#F97316)", initials:"PN" },
+  { id:2, name:"Dev mahato",   university:"TU Bhaktapur", year:"CS 2nd Year",     rating:4.7, reviews:34, sessions:34, rate:0,   teaches:["UI/UX","Figma"],         wants:["Node.js","React"],  bio:"Product designer. Swap Figma for web dev.", isOnline:false, avatarGrad:"linear-gradient(135deg,#10B981,#4ADE80)", initials:"DM" },
+  { id:3, name:"Tanish karki", university:"TU Kavrepalanchowk",    year:"CS 3rd Year",     rating:4.9, reviews:87, sessions:87, rate:150, teaches:["React","Node.js"],       wants:["Python","ML/AI"],   bio:"Full-stack dev. Teach React & Node.",      isOnline:true,  avatarGrad:"linear-gradient(135deg,#6C63FF,#A89BFF)", initials:"TK" },
+  { id:4, name:"Sanya Gupta", university:"KU Dhullikhel",year:"CS 4th Year",     rating:4.9, reviews:120,sessions:120,rate:200, teaches:["Java","DSA"],            wants:["ML/AI","Python"],   bio:"Google intern. Java & DSA expert.",        isOnline:true,  avatarGrad:"linear-gradient(135deg,#3B82F6,#8B5CF6)", initials:"SG" },
 ];
 
 function computeMatch(t)  { const a=t.teaches.filter(s=>MY_PROFILE.wants.includes(s)).length, b=t.wants.filter(s=>MY_PROFILE.teaches.includes(s)).length; return Math.min(100,Math.round((a+b)/Math.max(MY_PROFILE.wants.length,1)*100)); }
@@ -15,9 +15,9 @@ function isBarter(t)      { return t.teaches.some(s=>MY_PROFILE.wants.includes(s
 function recommendScore(t){ return computeMatch(t)*0.4 + (t.rating/5)*100*0.3 + Math.min(t.sessions/150*100,100)*0.2 + (t.isOnline?10:0); }
 
 const SESSIONS = [
-  { tutor:"Priya Nair",  skill:"UI/UX Design", time:"Today, 4:00 PM",    status:"upcoming", initials:"PN", grad:"linear-gradient(135deg,#EC4899,#F97316)", barter:true },
-  { tutor:"Dev Mehta",   skill:"Figma",         time:"Tomorrow, 2:00 PM", status:"upcoming", initials:"DM", grad:"linear-gradient(135deg,#10B981,#4ADE80)", barter:true },
-  { tutor:"Tanvir Khan", skill:"React",         time:"Yesterday, 6:00 PM",status:"done",     initials:"TK", grad:"linear-gradient(135deg,#6C63FF,#A89BFF)", barter:false },
+  { tutor:"Priya mahaju",  skill:"UI/UX Design", time:"Today, 4:00 PM",    status:"upcoming", initials:"PN", grad:"linear-gradient(135deg,#EC4899,#F97316)", barter:true },
+  { tutor:"Dev Mahato",   skill:"Figma",         time:"Tomorrow, 2:00 PM", status:"upcoming", initials:"DM", grad:"linear-gradient(135deg,#10B981,#4ADE80)", barter:true },
+  { tutor:"Tanvir ", skill:"React",         time:"Yesterday, 6:00 PM",status:"done",     initials:"TK", grad:"linear-gradient(135deg,#6C63FF,#A89BFF)", barter:false },
 ];
 
 function Avatar({ grad, initials, size=46 }) {

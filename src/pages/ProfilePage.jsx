@@ -8,9 +8,9 @@ const REVIEWS = [
   { name: "Neha R.", rating: 4, text: "Good session on Git workflows. Would book again!", avatar: "NR", time: "2 weeks ago" },
 ];
 const HISTORY = [
-  { skill: "React", tutor: "Tanvir Khan", date: "June 5, 2025", duration: "60 min", status: "completed" },
+  { skill: "React", tutor: "Tanish Karki ", date: "June 5, 2025", duration: "60 min", status: "completed" },
   { skill: "Python", tutor: "Sanya Gupta", date: "May 28, 2025", duration: "90 min", status: "completed" },
-  { skill: "UI/UX", tutor: "Dev Mehta", date: "May 20, 2025", duration: "60 min", status: "completed" },
+  { skill: "UI/UX", tutor: "Dev Mahato", date: "May 20, 2025", duration: "60 min", status: "completed" },
 ];
 
 export default function ProfilePage({ navigate }) {

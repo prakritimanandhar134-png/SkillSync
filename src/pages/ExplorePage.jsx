@@ -44,19 +44,19 @@ const ALL_TUTORS = [
     bio:"Mobile dev. Teach Android & Flutter, want to learn React.",
     isOnline:false, avatarIdx:4 },
 
-  { id:6,  name:"Priya Nair",    university:"IIT Delhi",      year:"Design 3rd Year",
+  { id:6,  name:"Priya mahaju",    university:"KU Dhulikhel",      year:"Design 3rd Year",
     rating:4.8, reviews:45,  sessions:45,  rate:0,
     teaches:["UI/UX","Figma","Design"], wants:["Java","DSA"],
     bio:"Interaction designer. Swap Figma skills for Java & DSA prep.",
     isOnline:true,  avatarIdx:5 },
 
-  { id:7,  name:"Arjun Verma",   university:"DTU",            year:"CS 2nd Year",
+  { id:7,  name:"Arjun chaudhary",   university:"PU Pokhara",            year:"CS 2nd Year",
     rating:4.5, reviews:19,  sessions:19,  rate:60,
     teaches:["React","HTML/CSS","JavaScript"], wants:["Python","Data Science"],
     bio:"Frontend learner. Teach HTML/CSS/JS basics, want to learn Python.",
     isOnline:false, avatarIdx:6 },
 
-  { id:8,  name:"Meera Joshi",   university:"BITS Goa",       year:"CS 4th Year",
+  { id:8,  name:"Meera Joshi",   university:"TU Kritipur",       year:"CS 4th Year",
     rating:4.9, reviews:74,  sessions:74,  rate:180,
     teaches:["DevOps","Docker","AWS"], wants:["UI/UX","Figma"],
     bio:"AWS-certified. Teach DevOps & cloud, want to learn design.",
