@@ -125,11 +125,8 @@ INSERT IGNORE INTO skills (name, category) VALUES
   ('Docker', 'Programming'), ('AWS', 'Programming'),
   ('Android', 'Programming'), ('Flutter', 'Programming'),
   ('UI/UX', 'Design'), ('Figma', 'Design'),
-  ('Graphic Design', 'Design'), ('Illustration', 'Design'),
-  ('Piano', 'Music'), ('Guitar', 'Music'),
-  ('Spanish', 'Languages'), ('Mandarin Chinese', 'Languages'),
-  ('French', 'Languages'), ('Public Speaking', 'Business'),
-  ('Marketing', 'Business'), ('Photography', 'Other');
+  ('Graphic Design', 'Design'), ('Illustration', 'Design');
+ 
 
 -- ── SEED: Admin user ──────────────────────
 -- Password is: admin123 (bcrypt hashed)

@@ -9,9 +9,7 @@ const STATS = [
 const SKILL_CATS = [
   { name:"Programming", count:1240, color:"#6C63FF" },
   { name:"Design",      count:890,  color:"#3B82F6" },
-  { name:"Business",    count:670,  color:"#8B5CF6" },
-  { name:"Languages",   count:520,  color:"#A5B4FC" },
-  { name:"Other",       count:1180, color:"#C4B5FD" },
+  
 ];
 const USERS = [
   { name:"Priya Sharma",  email:"priya@example.com",  role:"User",  sessions:214, status:"Active",   avatar:"PS", color:"#7C3AED" },
