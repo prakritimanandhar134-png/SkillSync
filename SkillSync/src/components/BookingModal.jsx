@@ -1,9 +1,12 @@
 import { useState } from "react";
 
+const DURATIONS = ["1 Session", "1 Week", "2 Weeks", "1 Month", "2 Months", "3 Months"];
+
 export default function BookingModal({ tutor, onClose, onConfirm }) {
   const [step, setStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
+  const [duration, setDuration] = useState("1 Session");
   const [topic, setTopic] = useState("");
 
   const times = ["9:00 AM", "10:00 AM", "11:00 AM", "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "6:00 PM", "7:00 PM"];
@@ -22,13 +25,14 @@ export default function BookingModal({ tutor, onClose, onConfirm }) {
         background: "white", borderRadius: 20,
         padding: 32, width: "100%", maxWidth: 480,
         boxShadow: "0 24px 80px rgba(108, 99, 255, 0.2)",
-        animation: "fadeIn 0.25s ease"
+        animation: "fadeIn 0.25s ease",
+        maxHeight: "90vh", overflowY: "auto"
       }} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
           <div>
             <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, fontWeight: 700 }}>
-              Book a Session
+              {tutor.barter ? "Request Skill Barter" : "Book a Session"}
             </h2>
             <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>
               with {tutor.name} · via Google Meet
@@ -53,7 +57,21 @@ export default function BookingModal({ tutor, onClose, onConfirm }) {
 
         {step === 1 && (
           <div>
-            <p style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Choose a date</p>
+            <p style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Course Duration</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 20 }}>
+              {DURATIONS.map(d => (
+                <button key={d} onClick={() => setDuration(d)} style={{
+                  padding: "9px 6px", borderRadius: "var(--radius-md)",
+                  border: "1.5px solid", fontSize: 12, fontWeight: 600,
+                  borderColor: duration === d ? "var(--primary)" : "var(--border)",
+                  background: duration === d ? "var(--primary-bg)" : "white",
+                  color: duration === d ? "var(--primary)" : "var(--text-secondary)",
+                  cursor: "pointer"
+                }}>{d}</button>
+              ))}
+            </div>
+
+            <p style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Choose a start date</p>
             <input
               type="date"
               value={selectedDate}
@@ -81,11 +99,15 @@ export default function BookingModal({ tutor, onClose, onConfirm }) {
 
         {step === 2 && (
           <div>
-            <p style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>What do you want to learn?</p>
+            <p style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>
+              {tutor.barter ? "Message to your skill exchange partner" : "What do you want to learn?"}
+            </p>
             <textarea
               value={topic}
               onChange={e => setTopic(e.target.value)}
-              placeholder="E.g., I need help understanding React hooks and state management..."
+              placeholder={tutor.barter
+                ? "E.g., I'd love to swap my Java skills for your UI/UX knowledge..."
+                : "E.g., I need help understanding React hooks and state management..."}
               className="input"
               rows={4}
               style={{ resize: "none" }}
@@ -95,19 +117,30 @@ export default function BookingModal({ tutor, onClose, onConfirm }) {
               background: "var(--surface-alt)", borderRadius: "var(--radius-md)",
               border: "1px solid var(--border)"
             }}>
-              <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>Session Summary</p>
+              <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>Request Summary</p>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 6 }}>
-                <span style={{ color: "var(--text-secondary)" }}>Tutor</span>
+                <span style={{ color: "var(--text-secondary)" }}>Partner</span>
                 <span style={{ fontWeight: 600 }}>{tutor.name}</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 6 }}>
-                <span style={{ color: "var(--text-secondary)" }}>Date & Time</span>
+                <span style={{ color: "var(--text-secondary)" }}>Duration</span>
+                <span style={{ fontWeight: 600 }}>{duration}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 6 }}>
+                <span style={{ color: "var(--text-secondary)" }}>Start Date & Time</span>
                 <span style={{ fontWeight: 600 }}>{selectedDate} · {selectedTime}</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
                 <span style={{ color: "var(--text-secondary)" }}>Platform</span>
                 <span style={{ fontWeight: 600, color: "#059669" }}>🎥 Google Meet</span>
               </div>
+              {tutor.barter && (
+                <div style={{ marginTop: 10, padding: "8px 10px", background: "#FFFBEB", borderRadius: 8, border: "1px solid #FDE68A" }}>
+                  <p style={{ fontSize: 12, color: "#92400E" }}>
+                    ⏰ If not accepted within <b>3 days</b>, this request will auto-expire and you'll be notified by email.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -121,18 +154,19 @@ export default function BookingModal({ tutor, onClose, onConfirm }) {
               fontSize: 32
             }}>✓</div>
             <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, fontWeight: 700, marginBottom: 8 }}>
-              Session Booked!
+              {tutor.barter ? "Request Sent!" : "Session Booked!"}
             </h3>
             <p style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: 20 }}>
-              A Google Meet link has been sent to your email.<br/>
-              Your session with {tutor.name} is confirmed.
+              {tutor.barter
+                ? <>Your barter request has been sent to {tutor.name}.<br/>You'll get an email when they respond.</>
+                : <>A Google Meet link has been sent to your email.<br/>Your session with {tutor.name} is confirmed.</>}
             </p>
             <div style={{
               padding: "12px 20px", background: "#F0EFFE",
               borderRadius: "var(--radius-md)", display: "inline-block"
             }}>
               <p style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>
-                📅 {selectedDate} at {selectedTime}
+                📅 {selectedDate} at {selectedTime} · {duration}
               </p>
             </div>
           </div>
@@ -154,7 +188,7 @@ export default function BookingModal({ tutor, onClose, onConfirm }) {
                 flex: 1, opacity: (step === 1 && (!selectedDate || !selectedTime)) ? 0.5 : 1
               }}
             >
-              {step === 2 ? "Confirm Booking" : "Next"}
+              {step === 2 ? (tutor.barter ? "Send Barter Request" : "Confirm Booking") : "Next"}
             </button>
           ) : (
             <button onClick={onClose} className="btn btn-primary" style={{ flex: 1 }}>

@@ -18,9 +18,14 @@ app.use("/api/sessions", require("./routes/sessions"));
 app.use("/api/reviews",  require("./routes/reviews"));
 app.use("/api/match",    require("./routes/match"));
 app.use("/api/admin",    require("./routes/admin"));
+app.use("/api/barter",   require("./routes/barter"));
 
 // ── Health check ──
 app.get("/", (req, res) => res.json({ message: "SkillSync API running ✅" }));
 
+// ── Start auto-reject cron job (checks every day for expired barter requests) ──
+const { startAutoRejectJob } = require("./utils/autoRejectJob");
+startAutoRejectJob();
+
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`SkillSync server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`✅ SkillSync server running on port ${PORT}`));
