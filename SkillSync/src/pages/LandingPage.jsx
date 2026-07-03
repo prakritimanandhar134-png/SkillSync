@@ -21,10 +21,10 @@ const CATEGORIES = [
 ];
 
 const MENTORS = [
-  { initials:"PS", name:"Priya Sharma",  role:"Full-Stack Engineer at Stripe",  tags:["React","TypeScript","Node.js"], reviews:127, sessions:214, rating:4.9, color:"#7C3AED" },
-  { initials:"MC", name:"Marcus Chen",   role:"Product Designer at Figma",       tags:["UI/UX","Figma","Prototyping"],  reviews:89,  sessions:156, rating:4.8, color:"#06B6D4" },
-  { initials:"SA", name:"Sofia Andrade", role:"Data Scientist at Spotify",        tags:["Python","ML/AI","Statistics"],   reviews:103, sessions:178, rating:4.9, color:"#10B981" },
-  { initials:"JO", name:"James Okafor",  role:"Marketing Lead at HubSpot",        tags:["SEO","Content Strategy","Analytics"], reviews:64, sessions:98, rating:4.7, color:"#F59E0B" },
+  { initials:"PS", name:"Nobel Dahal",  role:"Full-Stack Engineer ",  tags:["React","TypeScript","Node.js"], reviews:127, sessions:214, rating:4.9, color:"#7C3AED" },
+  { initials:"MC", name:"Marcus Tamang",   role:"Product Designer at Figma",       tags:["UI/UX","Figma","Prototyping"],  reviews:89,  sessions:156, rating:4.8, color:"#06B6D4" },
+  { initials:"SA", name:"Sofia Shrestha", role:"Data Scientist at Spotify",        tags:["Python","ML/AI","Statistics"],   reviews:103, sessions:178, rating:4.9, color:"#10B981" },
+  { initials:"JO", name:"Jenies maharjan",  role:"Marketing Lead at HubSpot",        tags:["SEO","Content Strategy","Analytics"], reviews:64, sessions:98, rating:4.7, color:"#F59E0B" },
 ];
 
 const TESTIMONIALS = [
