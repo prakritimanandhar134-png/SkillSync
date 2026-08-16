@@ -31,40 +31,67 @@ router.get("/:id", async (req, res) => {
   try {
     const [users] = await db.query(`
       SELECT u.id, u.full_name, u.email, u.university, u.year,
-             u.bio, u.location, u.avatar_url, u.skill_score, u.is_online, u.created_at,
-             ROUND(AVG(r.rating), 1) AS avg_rating,
-             COUNT(DISTINCT s.id)    AS session_count
+             u.bio, u.location, u.avatar_url, u.skill_score,
+             u.is_online, u.created_at,
+             ROUND(AVG(r.rating),1) AS avg_rating,
+             COUNT(DISTINCT s.id) AS session_count
       FROM users u
-      LEFT JOIN sessions s ON s.tutor_id = u.id AND s.status = 'completed'
-      LEFT JOIN reviews  r ON r.reviewee_id = u.id
+      LEFT JOIN sessions s
+        ON s.tutor_id = u.id AND s.status='completed'
+      LEFT JOIN reviews r
+        ON r.reviewee_id = u.id
       WHERE u.id = ?
       GROUP BY u.id
     `, [req.params.id]);
 
-    if (users.length === 0) return res.status(404).json({ message: "User not found." });
+    if (users.length === 0) {
+      return res.status(404).json({
+        message: "User not found."
+      });
+    }
 
-    // Get skills they teach
+    // Skills they teach
     const [teaches] = await db.query(`
-      SELECT s.id, s.name, s.category, ust.proficiency, ust.hourly_rate
-      FROM user_skills_teach ust
-      JOIN skills s ON s.id = ust.skill_id
-      WHERE ust.user_id = ?
+      SELECT
+        us.id,
+        us.level,
+        s.id AS skill_id,
+        s.name,
+        s.category
+      FROM user_skills us
+      JOIN skills s ON s.id = us.skill_id
+      WHERE us.user_id = ?
+      AND us.type = 'teach'
     `, [req.params.id]);
 
-    // Get skills they want to learn
+    // Skills they want to learn
     const [wants] = await db.query(`
-      SELECT s.id, s.name, s.category
-      FROM user_skills_learn usl
-      JOIN skills s ON s.id = usl.skill_id
-      WHERE usl.user_id = ?
+      SELECT
+        us.id,
+        us.level,
+        s.id AS skill_id,
+        s.name,
+        s.category
+      FROM user_skills us
+      JOIN skills s ON s.id = us.skill_id
+      WHERE us.user_id = ?
+      AND us.type = 'learn'
     `, [req.params.id]);
 
-    res.json({ ...users[0], teaches, wants });
+    res.json({
+      ...users[0],
+      teaches,
+      wants,
+    });
+
   } catch (err) {
-    res.status(500).json({ message: "Server error." });
+    console.error(err);
+    res.status(500).json({
+      message: "Server error."
+    });
   }
 });
-
+  
 // ── UPDATE user profile ───────────────────────
 // PUT /api/users/profile
 router.put("/profile", verifyToken, async (req, res) => {
@@ -82,31 +109,32 @@ router.put("/profile", verifyToken, async (req, res) => {
 
 // ── ADD skill to teach ────────────────────────
 // POST /api/users/skills/teach
-router.post("/skills/teach", verifyToken, async (req, res) => {
-  const { skill_id, proficiency, hourly_rate } = req.body;
-  try {
-    await db.query(
-      "INSERT IGNORE INTO user_skills_teach (user_id, skill_id, proficiency, hourly_rate) VALUES (?,?,?,?)",
-      [req.user.id, skill_id, proficiency || "Intermediate", hourly_rate || 0]
-    );
-    res.json({ message: "Skill added to teach list." });
-  } catch (err) {
-    res.status(500).json({ message: "Server error." });
-  }
-});
+
 
 // ── ADD skill to learn ────────────────────────
 // POST /api/users/skills/learn
-router.post("/skills/learn", verifyToken, async (req, res) => {
-  const { skill_id } = req.body;
+
+
+// POST /api/users/avatar
+router.post("/avatar", verifyToken, async (req, res) => {
+  const { avatar_url } = req.body;
+
   try {
     await db.query(
-      "INSERT IGNORE INTO user_skills_learn (user_id, skill_id) VALUES (?,?)",
-      [req.user.id, skill_id]
+      "UPDATE users SET avatar_url = ? WHERE id = ?",
+      [avatar_url, req.user.id]
     );
-    res.json({ message: "Skill added to learn list." });
+
+    res.json({
+      message: "Avatar updated.",
+      avatar_url
+    });
+
   } catch (err) {
-    res.status(500).json({ message: "Server error." });
+    console.error(err);
+    res.status(500).json({
+      message: "Server error."
+    });
   }
 });
 

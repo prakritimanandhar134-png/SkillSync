@@ -9,15 +9,55 @@ const { verifyAdmin } = require("../middleware/auth");
 // GET /api/admin/stats
 router.get("/stats", verifyAdmin, async (req, res) => {
   try {
-    const [[{ total_users }]]    = await db.query("SELECT COUNT(*) AS total_users FROM users WHERE role='user'");
-    const [[{ total_skills }]]   = await db.query("SELECT COUNT(*) AS total_skills FROM skills");
-    const [[{ sessions_today }]] = await db.query("SELECT COUNT(*) AS sessions_today FROM sessions WHERE DATE(created_at) = CURDATE()");
-    const [[{ avg_rating }]]     = await db.query("SELECT ROUND(AVG(rating),1) AS avg_rating FROM reviews");
-    const [[{ exchange_rate }]]  = await db.query("SELECT ROUND(COUNT(CASE WHEN is_barter=1 THEN 1 END)/COUNT(*)*100) AS exchange_rate FROM sessions");
+    const [[{ total_users }]] = await db.query(
+      "SELECT COUNT(*) AS total_users FROM users WHERE role='user'"
+    );
 
-    res.json({ total_users, total_skills, sessions_today, avg_rating, exchange_rate });
+    const [[{ total_skills }]] = await db.query(
+      "SELECT COUNT(*) AS total_skills FROM skills"
+    );
+
+    const [[{ total_sessions }]] = await db.query(
+      "SELECT COUNT(*) AS total_sessions FROM sessions"
+    );
+
+    const [[{ pending_sessions }]] = await db.query(
+      "SELECT COUNT(*) AS pending_sessions FROM sessions WHERE status='pending'"
+    );
+
+    const [recentUsers] = await db.query(`
+      SELECT id, full_name, email, created_at
+      FROM users
+      WHERE role='user'
+      ORDER BY created_at DESC
+      LIMIT 5
+    `);
+
+    const [recentSkills] = await db.query(`
+      SELECT
+        skills.id,
+        skills.name,
+        users.full_name
+      FROM skills
+      JOIN users ON users.id = skills.user_id
+      ORDER BY skills.created_at DESC
+      LIMIT 5
+    `);
+
+    res.json({
+      total_users,
+      total_skills,
+      total_sessions,
+      pending_sessions,
+      recentUsers,
+      recentSkills
+    });
+
   } catch (err) {
-    res.status(500).json({ message: "Server error." });
+    console.error(err);
+    res.status(500).json({
+      message: "Server error."
+    });
   }
 });
 

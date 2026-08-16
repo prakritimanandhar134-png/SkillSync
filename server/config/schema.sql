@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS skills (
   id         INT AUTO_INCREMENT PRIMARY KEY,
   name       VARCHAR(100) UNIQUE NOT NULL,
-  category   ENUM('Programming','Design','Business','Languages','Music','Science','Other') DEFAULT 'Other',
+  category   ENUM('Programming','Design') DEFAULT 'Other',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
