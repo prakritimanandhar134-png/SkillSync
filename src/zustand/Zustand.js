@@ -11,7 +11,7 @@ check:async ()=>{
     set({authstore:res.data
 
     })
-    console.log(authstore)
+    console.log(authstore);
 }
 }))
-export default  usestore;
+export default  usestore;//zustand store
