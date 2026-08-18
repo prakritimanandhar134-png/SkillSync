@@ -17,6 +17,22 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
 
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-uappuser",
+          "-papppassword"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s  
+
 
   backend:
     build:
@@ -25,6 +41,8 @@ services:
 
     container_name: project_backend
     restart: unless-stopped
+
+   
 
     ports:
       - "5001:5001"
@@ -36,8 +54,12 @@ services:
       DB_PASSWORD: apppassword
       DB_NAME: project_db
 
+    env_file:
+      - ./server/.env  
+
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
 
 
   frontend:
