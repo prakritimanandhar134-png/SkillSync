@@ -10,9 +10,9 @@ async function seedAdmin() {
     database: process.env.DB_NAME,
   });
 
-  const email = "admin@skillsync.com";
-  const password = "Admin@123";
-  const name = "SkillSync Admin";
+  const email = "prakiT@gmail.com";
+  const password = "prakiT@123";
+  const name = "prakiT mandndhar";
 
   try {
     const [existingUser] = await db.execute(
