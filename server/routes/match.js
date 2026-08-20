@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const db = require("../config/db");
+
+const { pool } = require("../config/db");
 const { verifyToken } = require("../middleware/auth");
 
 // ══════════════════════════════════════════════════════
@@ -23,7 +24,8 @@ function skillMatchScore(
     theirWantIds.includes(id)
   ).length;
 
-  const totalOverlap = theyCanTeachMe + iCanTeachThem;
+  const totalOverlap =
+    theyCanTeachMe + iCanTeachThem;
 
   const maxPossible = Math.max(
     myWantIds.length + myTeachIds.length,
@@ -32,7 +34,9 @@ function skillMatchScore(
 
   return Math.min(
     100,
-    Math.round((totalOverlap / maxPossible) * 100)
+    Math.round(
+      (totalOverlap / maxPossible) * 100
+    )
   );
 }
 
@@ -58,16 +62,16 @@ function recommendScore(
   sessionCount,
   isOnline
 ) {
-  const match = matchScore * 0.40;
+  const match = matchScore * 0.4;
 
   const rating =
-    ratingScore(avgRating) * 0.30;
+    ratingScore(avgRating) * 0.3;
 
   const exp =
     Math.min(
-      (sessionCount / 150) * 100,
+      (Number(sessionCount || 0) / 150) * 100,
       100
-    ) * 0.20;
+    ) * 0.2;
 
   const online = isOnline ? 10 : 0;
 
@@ -89,39 +93,54 @@ router.get(
       const myId = req.user.id;
 
       // ════════════════════════════════════════════════
-      // 1. GET MY SKILLS
+      // 1. GET MY TEACHING SKILLS
       // ════════════════════════════════════════════════
 
-      const [mySkillRows] = await db.query(
+      const [myTeachRows] = await pool.query(
         `
-        SELECT
-          skill_id,
-          type
-        FROM user_skills
+        SELECT skill_id
+        FROM user_skills_teach
         WHERE user_id = ?
         `,
         [myId]
       );
 
-      // Skills I can teach
-      const myTeachIds = mySkillRows
-        .filter((row) => row.type === "teach")
-        .map((row) => row.skill_id);
+      // ════════════════════════════════════════════════
+      // 2. GET MY LEARNING SKILLS
+      // ════════════════════════════════════════════════
 
-      // Skills I want to learn
-      const myWantIds = mySkillRows
-        .filter((row) => row.type === "learn")
-        .map((row) => row.skill_id);
+      const [myLearnRows] = await pool.query(
+        `
+        SELECT skill_id
+        FROM user_skills_learn
+        WHERE user_id = ?
+        `,
+        [myId]
+      );
+
+      const myTeachIds = myTeachRows.map(
+        (row) => Number(row.skill_id)
+      );
+
+      const myWantIds = myLearnRows.map(
+        (row) => Number(row.skill_id)
+      );
 
       console.log("My ID:", myId);
-      console.log("My teach IDs:", myTeachIds);
-      console.log("My want IDs:", myWantIds);
+      console.log(
+        "My teach IDs:",
+        myTeachIds
+      );
+      console.log(
+        "My want IDs:",
+        myWantIds
+      );
 
       // ════════════════════════════════════════════════
-      // 2. GET ALL OTHER USERS
+      // 3. GET ALL OTHER USERS
       // ════════════════════════════════════════════════
 
-      const [users] = await db.query(
+      const [users] = await pool.query(
         `
         SELECT
           u.id,
@@ -135,8 +154,11 @@ router.get(
           u.skill_score,
           u.is_online,
           u.created_at,
-         
-          ROUND(AVG(r.rating), 1) AS avg_rating,
+
+          ROUND(
+            AVG(DISTINCT r.rating),
+            1
+          ) AS avg_rating,
 
           COUNT(
             DISTINCT CASE
@@ -168,61 +190,78 @@ router.get(
           u.skill_score,
           u.is_online,
           u.created_at
-         
+
         `,
         [myId]
       );
 
       // ════════════════════════════════════════════════
-      // 3. CALCULATE RECOMMENDATION FOR EACH USER
+      // 4. CALCULATE RECOMMENDATION
+      //    FOR EACH USER
       // ════════════════════════════════════════════════
 
       const results = await Promise.all(
         users.map(async (user) => {
 
           // ══════════════════════════════════════════
-          // GET THIS USER'S SKILLS
+          // GET THEIR TEACHING SKILLS
           // ══════════════════════════════════════════
 
-          const [skillRows] = await db.query(
-            `
-            SELECT
-              us.skill_id,
-              us.type,
-              us.level,
-              sk.name,
-              sk.category
+          const [teachRows] =
+            await pool.query(
+              `
+              SELECT
+                ust.skill_id,
+                ust.proficiency,
+                ust.hourly_rate,
+                sk.name,
+                sk.category
 
-            FROM user_skills us
+              FROM user_skills_teach ust
 
-            JOIN skills sk
-              ON sk.id = us.skill_id
+              JOIN skills sk
+                ON sk.id = ust.skill_id
 
-            WHERE us.user_id = ?
-            `,
-            [user.id]
-          );
+              WHERE ust.user_id = ?
+              `,
+              [user.id]
+            );
 
           // ══════════════════════════════════════════
-          // SEPARATE TEACHING AND LEARNING SKILLS
+          // GET THEIR LEARNING SKILLS
           // ══════════════════════════════════════════
 
-          const teachRows = skillRows.filter(
-            (skill) => skill.type === "teach"
-          );
+          const [wantRows] =
+            await pool.query(
+              `
+              SELECT
+                usl.skill_id,
+                sk.name,
+                sk.category
 
-          const wantRows = skillRows.filter(
-            (skill) => skill.type === "learn"
-          );
+              FROM user_skills_learn usl
 
-          // Their skill IDs
-          const theirTeachIds = teachRows.map(
-            (skill) => skill.skill_id
-          );
+              JOIN skills sk
+                ON sk.id = usl.skill_id
 
-          const theirWantIds = wantRows.map(
-            (skill) => skill.skill_id
-          );
+              WHERE usl.user_id = ?
+              `,
+              [user.id]
+            );
+
+          // ══════════════════════════════════════════
+          // SKILL IDs
+          // ══════════════════════════════════════════
+
+          const theirTeachIds =
+            teachRows.map((skill) =>
+              Number(skill.skill_id)
+            );
+
+          const theirWantIds =
+            wantRows.map((skill) =>
+              Number(skill.skill_id)
+            );
 
           console.log(
             `User ${user.id} teaches:`,
@@ -235,35 +274,29 @@ router.get(
           // MATCH SCORE
           // ══════════════════════════════════════════
 
-          const mScore = skillMatchScore(
-            myTeachIds,
-            myWantIds,
-            theirTeachIds,
-            theirWantIds
-          );
+          const mScore =
+            skillMatchScore(
+              myTeachIds,
+              myWantIds,
+              theirTeachIds,
+              theirWantIds
+            );
 
           // ══════════════════════════════════════════
           // RECOMMENDATION SCORE
           // ══════════════════════════════════════════
 
-          const rScore = recommendScore(
-            mScore,
-            user.avg_rating,
-            user.session_count,
-            user.is_online
-          );
+          const rScore =
+            recommendScore(
+              mScore,
+              user.avg_rating,
+              user.session_count,
+              user.is_online
+            );
 
           // ══════════════════════════════════════════
           // BARTER CHECK
           // ══════════════════════════════════════════
-
-          /*
-            Barter is available when:
-
-            1. They can teach me something I want
-            AND
-            2. I can teach them something they want
-          */
 
           const barter =
             theirTeachIds.some((id) =>
@@ -290,15 +323,17 @@ router.get(
             is_online: user.is_online,
             created_at: user.created_at,
 
-            // Rating and experience
+            // Rating
             avg_rating: user.avg_rating,
-            session_count: user.session_count,
+
+            // Experience
+            session_count:
+              Number(user.session_count || 0),
 
             // ══════════════════════════════════════
-            // SKILLS
+            // SKILL NAMES
             // ══════════════════════════════════════
 
-            // Names for frontend
             teaches: teachRows.map(
               (skill) => skill.name
             ),
@@ -307,26 +342,47 @@ router.get(
               (skill) => skill.name
             ),
 
-            // Full skill information
+            // ══════════════════════════════════════
+            // FULL TEACHING SKILLS
+            // ══════════════════════════════════════
+
             teach_skills: teachRows.map(
               (skill) => ({
                 id: skill.skill_id,
                 name: skill.name,
                 category: skill.category,
-                level: skill.level
+
+                // Existing DB column
+                level:
+                  skill.proficiency,
+
+                proficiency:
+                  skill.proficiency,
+
+                hourly_rate:
+                  skill.hourly_rate
               })
             ),
+
+            // ══════════════════════════════════════
+            // FULL LEARNING SKILLS
+            // ══════════════════════════════════════
 
             want_skills: wantRows.map(
               (skill) => ({
                 id: skill.skill_id,
                 name: skill.name,
                 category: skill.category,
-                level: skill.level
+
+                // Learn table has no level
+                level: null
               })
             ),
 
-            // Skill IDs
+            // ══════════════════════════════════════
+            // SKILL IDs
+            // ══════════════════════════════════════
+
             teach_ids: theirTeachIds,
             want_ids: theirWantIds,
 
@@ -335,25 +391,20 @@ router.get(
             // ══════════════════════════════════════
 
             match_score: mScore,
+
             recommend_score: rScore,
 
             // ══════════════════════════════════════
             // BARTER
             // ══════════════════════════════════════
 
-            barter_ready: barter,
-
-            // ══════════════════════════════════════
-            // PAYMENT
-            // ══════════════════════════════════════
-
-            
+            barter_ready: barter
           };
         })
       );
 
       // ════════════════════════════════════════════════
-      // 4. SORT BEST MATCH FIRST
+      // 5. SORT BEST MATCH FIRST
       // ════════════════════════════════════════════════
 
       results.sort(
@@ -363,13 +414,12 @@ router.get(
       );
 
       // ════════════════════════════════════════════════
-      // 5. SEND RESULTS
+      // 6. SEND RESULTS
       // ════════════════════════════════════════════════
 
       res.json(results);
 
     } catch (err) {
-
       console.error(
         "Match error:",
         err
@@ -391,94 +441,109 @@ router.get(
   "/barter/:targetId",
   verifyToken,
   async (req, res) => {
-
     try {
-
       const myId = req.user.id;
 
       const targetId =
         parseInt(req.params.targetId);
 
-      // ══════════════════════════════════════════════
-      // GET MY SKILLS
-      // ══════════════════════════════════════════════
-
-      const [mySkills] = await db.query(
-        `
-        SELECT
-          skill_id,
-          type
-        FROM user_skills
-        WHERE user_id = ?
-        `,
-        [myId]
-      );
+      if (isNaN(targetId)) {
+        return res.status(400).json({
+          message: "Invalid target user ID."
+        });
+      }
 
       // ══════════════════════════════════════════════
-      // GET TARGET USER SKILLS
+      // GET MY TEACHING SKILLS
       // ══════════════════════════════════════════════
 
-      const [theirSkills] = await db.query(
-        `
-        SELECT
-          skill_id,
-          type
-        FROM user_skills
-        WHERE user_id = ?
-        `,
-        [targetId]
-      );
-
-      // ══════════════════════════════════════════════
-      // SEPARATE MY SKILLS
-      // ══════════════════════════════════════════════
-
-      const myTeachIds = mySkills
-        .filter((skill) =>
-          skill.type === "teach"
-        )
-        .map((skill) =>
-          skill.skill_id
-        );
-
-      const myWantIds = mySkills
-        .filter((skill) =>
-          skill.type === "learn"
-        )
-        .map((skill) =>
-          skill.skill_id
+      const [myTeachRows] =
+        await pool.query(
+          `
+          SELECT skill_id
+          FROM user_skills_teach
+          WHERE user_id = ?
+          `,
+          [myId]
         );
 
       // ══════════════════════════════════════════════
-      // SEPARATE THEIR SKILLS
+      // GET MY LEARNING SKILLS
       // ══════════════════════════════════════════════
 
-      const theirTeachIds = theirSkills
-        .filter((skill) =>
-          skill.type === "teach"
-        )
-        .map((skill) =>
-          skill.skill_id
+      const [myLearnRows] =
+        await pool.query(
+          `
+          SELECT skill_id
+          FROM user_skills_learn
+          WHERE user_id = ?
+          `,
+          [myId]
         );
 
-      const theirWantIds = theirSkills
-        .filter((skill) =>
-          skill.type === "learn"
-        )
-        .map((skill) =>
-          skill.skill_id
+      // ══════════════════════════════════════════════
+      // GET THEIR TEACHING SKILLS
+      // ══════════════════════════════════════════════
+
+      const [theirTeachRows] =
+        await pool.query(
+          `
+          SELECT skill_id
+          FROM user_skills_teach
+          WHERE user_id = ?
+          `,
+          [targetId]
+        );
+
+      // ══════════════════════════════════════════════
+      // GET THEIR LEARNING SKILLS
+      // ══════════════════════════════════════════════
+
+      const [theirLearnRows] =
+        await pool.query(
+          `
+          SELECT skill_id
+          FROM user_skills_learn
+          WHERE user_id = ?
+          `,
+          [targetId]
+        );
+
+      // ══════════════════════════════════════════════
+      // CONVERT TO IDs
+      // ══════════════════════════════════════════════
+
+      const myTeachIds =
+        myTeachRows.map((skill) =>
+          Number(skill.skill_id)
+        );
+
+      const myWantIds =
+        myLearnRows.map((skill) =>
+          Number(skill.skill_id)
+        );
+
+      const theirTeachIds =
+        theirTeachRows.map((skill) =>
+          Number(skill.skill_id)
+        );
+
+      const theirWantIds =
+        theirLearnRows.map((skill) =>
+          Number(skill.skill_id)
         );
 
       // ══════════════════════════════════════════════
       // MATCH SCORE
       // ══════════════════════════════════════════════
 
-      const mScore = skillMatchScore(
-        myTeachIds,
-        myWantIds,
-        theirTeachIds,
-        theirWantIds
-      );
+      const mScore =
+        skillMatchScore(
+          myTeachIds,
+          myWantIds,
+          theirTeachIds,
+          theirWantIds
+        );
 
       // ══════════════════════════════════════════════
       // BARTER CHECK
@@ -502,7 +567,6 @@ router.get(
       });
 
     } catch (err) {
-
       console.error(
         "Barter check error:",
         err
@@ -516,7 +580,7 @@ router.get(
 );
 
 // ══════════════════════════════════════════════════════
-// EXPORT ROUTER
+// EXPORT
 // ══════════════════════════════════════════════════════
 
 module.exports = router;

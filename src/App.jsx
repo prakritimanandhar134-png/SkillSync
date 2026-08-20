@@ -9,16 +9,16 @@ import {
   Outlet,
 } from "react-router-dom";
 
-import LandingPage        from "./pages/LandingPage";
-import RegisterPage       from "./pages/RegisterPage";
-import LoginPage          from "./pages/LoginPage";
+import LandingPage from "./pages/LandingPage";
+import RegisterPage from "./pages/RegisterPage";
+import LoginPage from "./pages/LoginPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
-import ResetPasswordPage  from "./pages/ResetPasswordPage";
-import Dashboard          from "./pages/Dashboard";
-import ExplorePage        from "./pages/ExplorePage";
-import SkillsPage         from "./pages/SkillsPage";
-import ProfilePage        from "./pages/ProfilePage";
-import AdminPage          from "./pages/AdminPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
+import Dashboard from "./pages/Dashboard";
+import ExplorePage from "./pages/ExplorePage";
+import SkillsPage from "./pages/SkillsPage";
+import ProfilePage from "./pages/ProfilePage";
+import AdminPage from "./pages/AdminPage";
 
 import Navbar from "./components/Navbar";
 import ChatBox from "./components/ChatBox";
@@ -26,14 +26,10 @@ import usestore from "./zustand/Zustand";
 
 
 
-
 function ProtectedRoute({ adminOnly = false }) {
-  const { authstore } = usestore();
-
   const token = localStorage.getItem("token");
   const user = localStorage.getItem("user");
   const role = localStorage.getItem("role");
-
 
   if (!token || !user) {
     return <Navigate to="/login" replace />;
@@ -53,14 +49,12 @@ function ProtectedRoute({ adminOnly = false }) {
 
   const userRole = role || parsedUser.role;
 
-  // Admin-only route
   if (adminOnly && userRole !== "admin") {
     return <Navigate to="/dashboard" replace />;
   }
 
   return <Outlet />;
 }
-
 
 
 
@@ -72,7 +66,7 @@ function AppLayout() {
 
   const { authstore, check } = usestore();
 
- 
+
   useEffect(() => {
     check();
   }, [check]);
@@ -80,7 +74,7 @@ function AppLayout() {
   console.log("the auth is ", authstore);
 
 
-  
+
   const noNavPages = [
     "/",
     "/register",
@@ -106,7 +100,7 @@ function AppLayout() {
   };
 
 
- 
+
   const token = localStorage.getItem("token");
   const user = localStorage.getItem("user");
 
@@ -137,7 +131,7 @@ function AppLayout() {
           onLogout={handleLogout}
         />
       )}
-    <Routes>
+      <Routes>
 
         <Route
           path="/"
