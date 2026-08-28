@@ -46,29 +46,60 @@ export default function RegisterPage({ navigate, onRegister }) {
     return e;
   };
 
-  const handleSubmit = async () => {
-    const e = validate();
-    if (Object.keys(e).length) { setErrors(e); return; }
+ const handleSubmit = async () => {
+  const e = validate();
 
-    setLoading(true);
-    setServerError("");
+  if (Object.keys(e).length) {
+    setErrors(e);
+    return;
+  }
 
-    try {
-      const data = await registerUser(form);
+  setLoading(true);
+  setServerError("");
 
-      if (data.token) {
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
-        onRegister(data.user);
-      } else {
-        setServerError(data.message || "Registration failed. Please try again.");
-      }
-    } catch (err) {
-      setServerError("Server error. Make sure backend is running.");
-    } finally {
-      setLoading(false);
+  try {
+    console.log("A: calling register API");
+
+    const data = await registerUser(form);
+
+    console.log("B: API RESPONSE =", data);
+    console.log("C: token =", data?.token);
+    console.log("D: user =", data?.user);
+
+    if (!data?.token) {
+      console.log("E: token not found");
+
+      setServerError(
+        data?.message || "Registration failed. Please try again."
+      );
+
+      return;
     }
-  };
+
+    console.log("E: token found");
+
+    localStorage.setItem("token", data.token);
+    console.log("F: token saved");
+
+    localStorage.setItem("user", JSON.stringify(data.user));
+    console.log("G: user saved");
+
+    console.log("H: navigating dashboard");
+
+    navigate("/dashboard");
+
+    console.log("I: navigate called");
+
+  } catch (err) {
+    console.error("🔥 ACTUAL REGISTER ERROR:", err);
+
+    setServerError(
+      err?.message || "Registration failed."
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   const set = (field, val) => {
     setForm(f => ({ ...f, [field]: val }));
