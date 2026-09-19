@@ -1,0 +1,81 @@
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: project_mysql
+    restart: unless-stopped
+
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: project_db
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: apppassword
+
+    ports:
+      - "3306:3306"
+
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-uappuser",
+          "-papppassword"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s  
+
+
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+
+    container_name: project_backend
+    restart: unless-stopped
+
+   
+
+    ports:
+      - "5001:5001"
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: appuser
+      DB_PASSWORD: apppassword
+      DB_NAME: project_db
+
+    env_file:
+      - ./server/.env  
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+  frontend:
+    build:
+      context: .
+      dockerfile: ./src/Dockerfile
+
+    container_name: project_frontend
+    restart: unless-stopped
+
+    ports:
+      - "5173:5173"
+
+    depends_on:
+      - backend
+
+
+volumes:
+  mysql_data:

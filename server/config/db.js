@@ -1,22 +1,53 @@
 const mysql = require("mysql2/promise");
 const dotenv = require("dotenv");
+
 dotenv.config();
 
 const pool = mysql.createPool({
-  host:     process.env.DB_HOST     || "localhost",
-  user:     process.env.DB_USER     || "root",
+  host: process.env.DB_HOST || "127.0.0.1",
+  port: Number(process.env.DB_PORT) || 3306,
+  user: process.env.DB_USER || "root",
   password: process.env.DB_PASSWORD || "",
-  database: process.env.DB_NAME     || "skillsync",
+  database: process.env.DB_NAME || "skillsync",
+
   waitForConnections: true,
   connectionLimit: 10,
 });
 
-// Test connection
-pool.getConnection()
-  .then(conn => {
-    console.log("✅ MySQL connected successfully");
-    conn.release();
-  })
-  .catch(err => console.error("❌ MySQL connection failed:", err.message));
+async function connectDB() {
+  let attempts = 10;
 
-module.exports = pool;
+  while (attempts > 0) {
+    try {
+      const conn = await pool.getConnection();
+
+      console.log("✅ MySQL connected successfully");
+
+      conn.release();
+
+      return true;
+    } catch (error) {
+      attempts--;
+
+      console.log(
+        `❌ MySQL connection failed. Retrying... (${10 - attempts}/10)`
+      );
+
+      console.log(error.message);
+
+      if (attempts === 0) {
+        console.error("❌ Could not connect to MySQL");
+        return false;
+      }
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, 3000)
+      );
+    }
+  }
+}
+
+module.exports = {
+  pool,
+  connectDB,
+};

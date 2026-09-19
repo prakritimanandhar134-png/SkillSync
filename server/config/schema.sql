@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS skills (
   id         INT AUTO_INCREMENT PRIMARY KEY,
   name       VARCHAR(100) UNIQUE NOT NULL,
-  category   ENUM('Programming','Design','Business','Languages','Music','Science','Other') DEFAULT 'Other',
+  category   ENUM('Programming','Design','Other') DEFAULT 'Other',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -113,6 +113,22 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (sender_id)   REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- ── NOTIFICATIONS ──────────────────────────
+CREATE TABLE IF NOT EXISTS notifications (
+  id           INT AUTO_INCREMENT PRIMARY KEY,
+  user_id      INT NOT NULL,
+  type         VARCHAR(50) NOT NULL,
+  title        VARCHAR(255) NOT NULL,
+  message      TEXT NOT NULL,
+  reference_id INT NULL,
+  is_read      BOOLEAN DEFAULT FALSE,
+  created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (user_id)
+    REFERENCES users(id)
+    ON DELETE CASCADE
 );
 
 -- ── SEED: Default skills ───────────────────

@@ -1,313 +1,1926 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  getAdminStats,
+  getAdminUsers,
+  getAdminSessions,
+  deleteUser,
+} from "../api";
 
-const STATS = [
-  { label:"Total Users",    value:"42,186", sub:"+2,340 this month", delta:"+18%", icon:"👥", color:"#EEF2FF" },
-  { label:"Active Skills",  value:"8,502",  sub:"+412 this week",    delta:"+5%",  icon:"📖", color:"#ECFDF5" },
-  { label:"Sessions Today", value:"1,247",  sub:"Peak hour: 3-4 PM", delta:"+31%", icon:"📅", color:"#EFF6FF" },
-  { label:"Revenue MRR",    value:"$48.2k", sub:"Pro subscriptions",  delta:"+12%", icon:"📈", color:"#FFFBEB" },
-];
-const SKILL_CATS = [
-  { name:"Programming", count:1240, color:"#6C63FF" },
-  { name:"Design",      count:890,  color:"#3B82F6" },
-  
-];
-const USERS = [
-  { name:"Priya Sharma",  email:"priya@example.com",  role:"User",  sessions:214, status:"Active",   avatar:"PS", color:"#7C3AED" },
-  { name:"Marcus Chen",   email:"marcus@example.com",  role:"User",  sessions:156, status:"Active",   avatar:"MC", color:"#06B6D4" },
-  { name:"Sofia Andrade", email:"sofia@example.com",   role:"User",  sessions:178, status:"Active",   avatar:"SA", color:"#10B981" },
-  { name:"James Okafor",  email:"james@example.com",   role:"User",  sessions:98,  status:"Inactive", avatar:"JO", color:"#F59E0B" },
-  { name:"Alex Johnson",  email:"alex@example.com",    role:"Admin", sessions:47,  status:"Active",   avatar:"AJ", color:"#6C63FF" },
-];
+const purple = "#6C63FF";
 
-// Tiny SVG line chart
-function LineChart() {
-  const pts = [0,5,8,15,20,25,35,38,42,44,48].map((v,i) => `${i*70},${200-v*4}`).join(" ");
+const styles = {
+
+  chartWrapper: {
+    width: "100%",
+    overflow: "hidden",
+  },
+
+  emptyChart: {
+    minHeight: 220,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#64748b",
+    textAlign: "center",
+  },
+
+  categoryChart: {
+    padding: "15px 5px",
+  },
+
+  categoryRow: {
+    marginBottom: 24,
+  },
+
+  categoryHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+    color: "#334155",
+  },
+
+  progressBackground: {
+    width: "100%",
+    height: 12,
+    background: "#eef2ff",
+    borderRadius: 20,
+    overflow: "hidden",
+  },
+
+  progressBar: {
+    height: "100%",
+    borderRadius: 20,
+    transition: "width 0.5s ease",
+  },
+
+  sessionChart: {
+    padding: "10px 5px",
+  },
+
+  sessionRow: {
+    marginBottom: 20,
+  },
+
+  sessionTop: {
+    display: "flex",
+    justifyContent: "space-between",
+    marginBottom: 7,
+    color: "#334155",
+  },
+
+};
+
+function UserGrowthChart({ data = [] }) {
+  if (!data.length) {
+    return (
+      <div style={styles.emptyChart}>
+        <div style={{ fontSize: 36 }}>📈</div>
+        <p>No user growth data yet</p>
+        <span>New registrations will appear here.</span>
+      </div>
+    );
+  }
+
+  const max = Math.max(...data.map(item => Number(item.count)), 1);
+
+  const width = 700;
+  const height = 250;
+  const padding = 35;
+
+  const points = data.map((item, index) => {
+    const x =
+      padding +
+      (index / Math.max(data.length - 1, 1)) *
+        (width - padding * 2);
+
+    const y =
+      height -
+      padding -
+      (Number(item.count) / max) *
+        (height - padding * 2);
+
+    return `${x},${y}`;
+  }).join(" ");
+
   return (
-    <svg width="100%" height="200" viewBox="0 0 700 210" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#6C63FF" stopOpacity="0.2"/>
-          <stop offset="100%" stopColor="#6C63FF" stopOpacity="0"/>
-        </linearGradient>
-      </defs>
-      {[0,50,100,150,200].map(y => (
-        <line key={y} x1="0" y1={y} x2="700" y2={y} stroke="#F3F4F6" strokeWidth="1"/>
-      ))}
-      <polyline fill="none" stroke="#6C63FF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pts}/>
-      <polygon fill="url(#chartGrad)" points={`0,200 ${pts} 700,200`}/>
-      {["Jan","Feb","Mar","Apr","May","Jun"].map((m,i) => (
-        <text key={m} x={i*112+20} y="215" fontSize="11" fill="#9CA3AF">{m}</text>
-      ))}
-      {[0,15000,30000,45000,60000].map((v,i) => (
-        <text key={v} x="0" y={200-i*48} fontSize="10" fill="#9CA3AF">{v>0?v.toLocaleString():0}</text>
-      ))}
-    </svg>
+    <div style={styles.chartWrapper}>
+
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        style={{ width: "100%", height: 260 }}
+      >
+
+        {/* horizontal grid */}
+        {[0, 1, 2, 3, 4].map(i => {
+          const y =
+            padding +
+            (i / 4) *
+              (height - padding * 2);
+
+          return (
+            <line
+              key={i}
+              x1={padding}
+              x2={width - padding}
+              y1={y}
+              y2={y}
+              stroke="#e5e7eb"
+              strokeWidth="1"
+            />
+          );
+        })}
+
+        {/* area */}
+        <polygon
+          points={`${padding},${height - padding} ${points} ${width - padding},${height - padding}`}
+          fill="rgba(99,102,241,0.12)"
+        />
+
+        {/* line */}
+        <polyline
+          points={points}
+          fill="none"
+          stroke="#6366f1"
+          strokeWidth="4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+
+        {/* points */}
+        {data.map((item, index) => {
+
+          const x =
+            padding +
+            (index / Math.max(data.length - 1, 1)) *
+              (width - padding * 2);
+
+          const y =
+            height -
+            padding -
+            (Number(item.count) / max) *
+              (height - padding * 2);
+
+          return (
+            <g key={index}>
+
+              <circle
+                cx={x}
+                cy={y}
+                r="6"
+                fill="#6366f1"
+                stroke="white"
+                strokeWidth="3"
+              />
+
+              <text
+                x={x}
+                y={height - 10}
+                textAnchor="middle"
+                fontSize="11"
+                fill="#64748b"
+              >
+                {item.month?.slice(5) || ""}
+              </text>
+
+            </g>
+          );
+        })}
+
+      </svg>
+
+    </div>
   );
 }
 
-// Donut chart
-function DonutChart() {
-  const total = SKILL_CATS.reduce((a,c)=>a+c.count,0);
-  let offset = 0;
-  const r = 60, cx = 80, cy = 80, circ = 2*Math.PI*r;
+  function SkillsCategoryChart({ data = [] }) {
+
+  const total = data.reduce(
+    (sum, item) => sum + Number(item.count),
+    0
+  );
+
+  if (!total) {
+    return (
+      <div style={styles.emptyChart}>
+        <div style={{ fontSize: 36 }}>🎯</div>
+        <p>No skills available</p>
+        <span>Add skills to see category statistics.</span>
+      </div>
+    );
+  }
+
   return (
-    <svg width="160" height="160" viewBox="0 0 160 160">
-      {SKILL_CATS.map(cat => {
-        const pct = cat.count/total;
-        const dash = pct*circ;
-        const gap = circ - dash;
-        const el = (
-          <circle key={cat.name} cx={cx} cy={cy} r={r}
-            fill="none" stroke={cat.color} strokeWidth="22"
-            strokeDasharray={`${dash} ${gap}`}
-            strokeDashoffset={-offset*circ}
-            style={{ transform:"rotate(-90deg)", transformOrigin:"80px 80px" }}
-          />
+    <div style={styles.categoryChart}>
+
+      {data.map((item, index) => {
+
+        const percentage =
+          (Number(item.count) / total) * 100;
+
+        return (
+          <div
+            key={item.category}
+            style={styles.categoryRow}
+          >
+
+            <div style={styles.categoryHeader}>
+
+              <span>
+                {item.category === "Programming"
+                  ? "💻"
+                  : "🎨"}{" "}
+                {item.category}
+              </span>
+
+              <strong>
+                {item.count}
+              </strong>
+
+            </div>
+
+            <div style={styles.progressBackground}>
+
+              <div
+                style={{
+                  ...styles.progressBar,
+                  width: `${percentage}%`,
+                  background:
+                    index === 0
+                      ? "#6366f1"
+                      : "#06b6d4"
+                }}
+              />
+
+            </div>
+
+            <small>
+              {percentage.toFixed(0)}% of all skills
+            </small>
+
+          </div>
         );
-        offset += pct;
-        return el;
       })}
-      <circle cx={cx} cy={cy} r={r-14} fill="white"/>
-    </svg>
+
+    </div>
+  );
+}
+
+function SessionsStatusChart({ data = [] }) {
+
+  const total = data.reduce(
+    (sum, item) => sum + Number(item.count),
+    0
+  );
+
+  if (!total) {
+    return (
+      <div style={styles.emptyChart}>
+        <div style={{ fontSize: 36 }}>📊</div>
+        <p>No sessions yet</p>
+        <span>Session activity will appear here.</span>
+      </div>
+    );
+  }
+
+  const colors = {
+    pending: "#f59e0b",
+    accepted: "#10b981",
+    completed: "#6366f1",
+    rejected: "#ef4444",
+    cancelled: "#64748b"
+  };
+
+  return (
+    <div style={styles.sessionChart}>
+
+      {data.map(item => {
+
+        const status =
+          String(item.status || "unknown").toLowerCase();
+
+        const percentage =
+          (Number(item.count) / total) * 100;
+
+        return (
+          <div
+            key={status}
+            style={styles.sessionRow}
+          >
+
+            <div style={styles.sessionTop}>
+
+              <span
+                style={{
+                  textTransform: "capitalize"
+                }}
+              >
+                {status}
+              </span>
+
+              <strong>
+                {item.count}
+              </strong>
+
+            </div>
+
+            <div style={styles.progressBackground}>
+
+              <div
+                style={{
+                  ...styles.progressBar,
+                  width: `${percentage}%`,
+                  background:
+                    colors[status] || "#6366f1"
+                }}
+              />
+
+            </div>
+
+          </div>
+        );
+      })}
+
+    </div>
+  );
+}
+
+
+ 
+
+function StatCard({ title, value, subtitle, icon }) {
+  return (
+    <div
+      style={{
+        background: "#fff",
+        border: "1px solid #E5E7EB",
+        borderRadius: 16,
+        padding: 22,
+        boxShadow: "0 4px 16px rgba(0,0,0,0.04)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+        }}
+      >
+        <div>
+          <p
+            style={{
+              margin: 0,
+              color: "#6B7280",
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            {title}
+          </p>
+
+          <h2
+            style={{
+              margin: "8px 0 4px",
+              color: "#111827",
+              fontSize: 30,
+              fontWeight: 800,
+            }}
+          >
+            {value}
+          </h2>
+
+          <p
+            style={{
+              margin: 0,
+              color: "#9CA3AF",
+              fontSize: 12,
+            }}
+          >
+            {subtitle}
+          </p>
+        </div>
+
+        <div
+          style={{
+            width: 42,
+            height: 42,
+            borderRadius: 12,
+            background: "#EEF2FF",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 20,
+          }}
+        >
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatusBadge({ status }) {
+  const value = String(status || "unknown").toLowerCase();
+
+  let background = "#F3F4F6";
+  let color = "#6B7280";
+
+  if (value === "completed") {
+    background = "#ECFDF5";
+    color = "#059669";
+  } else if (
+    value === "pending" ||
+    value === "requested"
+  ) {
+    background = "#FFFBEB";
+    color = "#D97706";
+  } else if (value === "upcoming") {
+    background = "#EEF2FF";
+    color = "#4F46E5";
+  } else if (
+    value === "rejected" ||
+    value === "cancelled"
+  ) {
+    background = "#FEF2F2";
+    color = "#DC2626";
+  }
+
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "5px 10px",
+        borderRadius: 999,
+        background,
+        color,
+        fontSize: 11,
+        fontWeight: 700,
+        textTransform: "capitalize",
+      }}
+    >
+      {value === "requested" ? "Pending" : value}
+    </span>
+  );
+}
+
+function EmptyState({ icon, title, message }) {
+  return (
+    <div
+      style={{
+        textAlign: "center",
+        padding: "60px 20px",
+      }}
+    >
+      <div
+        style={{
+          fontSize: 38,
+          marginBottom: 12,
+        }}
+      >
+        {icon}
+      </div>
+
+      <h3
+        style={{
+          margin: "0 0 6px",
+          color: "#374151",
+          fontSize: 16,
+        }}
+      >
+        {title}
+      </h3>
+
+      <p
+        style={{
+          margin: 0,
+          color: "#9CA3AF",
+          fontSize: 13,
+        }}
+      >
+        {message}
+      </p>
+    </div>
   );
 }
 
 export default function AdminPage({ navigate }) {
   const [activeTab, setActiveTab] = useState("overview");
 
-  return (
-    <div style={{ background:"#F3F4F6", minHeight:"100vh", fontFamily:"'Inter',sans-serif" }}>
-      <div style={{ maxWidth:1200, margin:"0 auto", padding:"28px 24px" }}>
+ const [stats, setStats] = useState({
+  total_users: 0,
+  total_skills: 0,
+  total_sessions: 0,
+  pending_sessions: 0,
+  recentUsers: [],
+  recentSkills: [],
+  userGrowth: [],
+  skillsByCategory: [],
+  sessionsByStatus: [],
+});
+  const [users, setUsers] = useState([]);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [sessions, setSessions] = useState([]);
 
-        {/* Header */}
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:28 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:14 }}>
-            <div style={{ width:44, height:44, borderRadius:12, background:"linear-gradient(135deg,#6C63FF,#4F46E5)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>⚙️</div>
-            <div>
-              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                <h1 style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:20, fontWeight:800, color:"#111827" }}>Admin Console</h1>
-                <span style={{ padding:"3px 10px", background:"#EEF2FF", color:"#6C63FF", borderRadius:99, fontSize:12, fontWeight:700 }}>Super Admin</span>
-              </div>
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const [search, setSearch] = useState("");
+  const [confirmUser, setConfirmUser] = useState(null);
+
+  const fetchAll = async () => {
+    try {
+      setRefreshing(true);
+
+      const [statsResult, usersResult, sessionsResult] =
+        await Promise.all([
+          getAdminStats(),
+          getAdminUsers(),
+          getAdminSessions(),
+        ]);
+
+      console.log("ADMIN STATS:", statsResult);
+      console.log("ADMIN USERS:", usersResult);
+      console.log("ADMIN SESSIONS:", sessionsResult);
+
+    if (statsResult && !statsResult.message) {
+  setStats({
+    total_users: statsResult.total_users || 0,
+    total_skills: statsResult.total_skills || 0,
+    total_sessions: statsResult.total_sessions || 0,
+    pending_sessions: statsResult.pending_sessions || 0,
+
+    recentUsers: Array.isArray(statsResult.recentUsers)
+      ? statsResult.recentUsers
+      : [],
+
+    recentSkills: Array.isArray(statsResult.recentSkills)
+      ? statsResult.recentSkills
+      : [],
+
+    userGrowth: Array.isArray(statsResult.userGrowth)
+      ? statsResult.userGrowth
+      : [],
+
+    skillsByCategory: Array.isArray(statsResult.skillsByCategory)
+      ? statsResult.skillsByCategory
+      : [],
+
+    sessionsByStatus: Array.isArray(statsResult.sessionsByStatus)
+      ? statsResult.sessionsByStatus
+      : [],
+  });
+}
+      if (Array.isArray(usersResult)) {
+        setUsers(usersResult);
+      } else {
+        console.error(
+          "Admin users response is not an array:",
+          usersResult
+        );
+        setUsers([]);
+      }
+
+      if (Array.isArray(sessionsResult)) {
+        setSessions(sessionsResult);
+      } else {
+        console.error(
+          "Admin sessions response is not an array:",
+          sessionsResult
+        );
+        setSessions([]);
+      }
+    } catch (error) {
+      console.error("Admin dashboard error:", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAll();
+  }, []);
+
+  const filteredUsers = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    return users
+      .filter((user) => user.role !== "admin")
+      .filter((user) => {
+        if (!query) return true;
+
+        return (
+          user.full_name
+            ?.toLowerCase()
+            .includes(query) ||
+          user.email
+            ?.toLowerCase()
+            .includes(query) ||
+          user.university
+            ?.toLowerCase()
+            .includes(query)
+        );
+      });
+  }, [users, search]);
+
+  const handleDelete = async () => {
+    if (!confirmUser) return;
+
+    try {
+      await deleteUser(confirmUser.id);
+
+      setUsers((previous) =>
+        previous.filter(
+          (user) => user.id !== confirmUser.id
+        )
+      );
+
+      setStats((previous) => ({
+        ...previous,
+        total_users: Math.max(
+          0,
+          previous.total_users - 1
+        ),
+      }));
+
+      setConfirmUser(null);
+    } catch (error) {
+      console.error("Delete user error:", error);
+      alert("Could not delete this user.");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#F5F7FB",
+          fontFamily: "Inter, Arial, sans-serif",
+        }}
+      >
+        <div style={{ textAlign: "center" }}>
+          <div
+            style={{
+              width: 45,
+              height: 45,
+              border: "4px solid #E5E7EB",
+              borderTopColor: purple,
+              borderRadius: "50%",
+              margin: "0 auto 15px",
+              animation:
+                "adminSpin 0.8s linear infinite",
+            }}
+          />
+
+          <p
+            style={{
+              margin: 0,
+              color: "#6B7280",
+              fontSize: 14,
+            }}
+          >
+            Loading admin dashboard...
+          </p>
+
+          <style>
+            {`
+              @keyframes adminSpin {
+                to {
+                  transform: rotate(360deg);
+                }
+              }
+            `}
+          </style>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#F5F7FB",
+        fontFamily: "Inter, Arial, sans-serif",
+        color: "#111827",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 1250,
+          margin: "0 auto",
+          padding: "30px 24px 50px",
+        }}
+      >
+        {/* HEADER */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 20,
+            marginBottom: 30,
+          }}
+        >
+          <div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                marginBottom: 6,
+              }}
+            >
+              <h1
+                style={{
+                  margin: 0,
+                  fontSize: 27,
+                  fontWeight: 800,
+                  letterSpacing: "-0.5px",
+                }}
+              >
+                Admin Dashboard
+              </h1>
+
+              <span
+                style={{
+                  background: "#EEF2FF",
+                  color: purple,
+                  padding: "5px 10px",
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 800,
+                }}
+              >
+                ADMIN
+              </span>
             </div>
+
+            <p
+              style={{
+                margin: 0,
+                color: "#6B7280",
+                fontSize: 14,
+              }}
+            >
+              Manage SkillSync users, skills and sessions.
+            </p>
           </div>
-          <button style={{ padding:"9px 18px", background:"white", color:"#374151", border:"1.5px solid #E5E7EB", borderRadius:10, fontSize:13, fontWeight:600, cursor:"pointer", display:"flex", alignItems:"center", gap:6 }}>
-            ⬇️ Export Data
+
+          <button
+            onClick={fetchAll}
+            disabled={refreshing}
+            style={{
+              border: "1px solid #E5E7EB",
+              background: "#FFFFFF",
+              color: "#374151",
+              padding: "10px 16px",
+              borderRadius: 10,
+              cursor: refreshing
+                ? "not-allowed"
+                : "pointer",
+              fontWeight: 700,
+              opacity: refreshing ? 0.6 : 1,
+            }}
+          >
+            {refreshing ? "Refreshing..." : "↻ Refresh"}
           </button>
         </div>
 
-        {/* Stats */}
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:16, marginBottom:28 }}>
-          {STATS.map(s => (
-            <div key={s.label} style={{ background:"white", borderRadius:16, padding:"22px 20px", border:"1px solid #F3F4F6", boxShadow:"0 1px 8px rgba(0,0,0,0.04)" }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
-                <p style={{ fontSize:13, color:"#6B7280" }}>{s.label}</p>
-                <div style={{ width:36, height:36, borderRadius:10, background:s.color, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>{s.icon}</div>
-              </div>
-              <p style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:28, fontWeight:800, color:"#111827", marginBottom:4 }}>{s.value}</p>
-              <div style={{ display:"flex", gap:8 }}>
-                <span style={{ fontSize:12, color:"#6B7280" }}>{s.sub}</span>
-                <span style={{ fontSize:12, fontWeight:700, color:"#10B981" }}>↑ {s.delta}</span>
-              </div>
-            </div>
-          ))}
+        {/* STATS */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(4, minmax(0, 1fr))",
+            gap: 16,
+            marginBottom: 28,
+          }}
+        >
+          <StatCard
+            title="Total Users"
+            value={stats.total_users}
+            subtitle="Registered users"
+            icon="👥"
+          />
+
+          <StatCard
+            title="Total Skills"
+            value={stats.total_skills}
+            subtitle="Skills available"
+            icon="🎯"
+          />
+
+          <StatCard
+            title="Total Sessions"
+            value={stats.total_sessions}
+            subtitle="All booked sessions"
+            icon="📅"
+          />
+
+          <StatCard
+            title="Pending Sessions"
+            value={stats.pending_sessions}
+            subtitle="Waiting for action"
+            icon="⏳"
+          />
         </div>
 
-        {/* Tabs */}
-        <div style={{ display:"flex", gap:0, marginBottom:20, borderBottom:"2px solid #E5E7EB", background:"white", borderRadius:"12px 12px 0 0", padding:"0 20px" }}>
-          {["Overview","Users","Skills","Reports"].map((tab,i) => (
-            <button key={tab} onClick={() => setActiveTab(tab.toLowerCase())} style={{
-              padding:"14px 20px", background:"none", border:"none",
-              fontSize:14, fontWeight:600, cursor:"pointer",
-              color:activeTab===tab.toLowerCase()?"#6C63FF":"#6B7280",
-              borderBottom:activeTab===tab.toLowerCase()?"2px solid #6C63FF":"2px solid transparent",
-              marginBottom:-2, position:"relative"
-            }}>
-              {tab}
-              {tab==="Reports" && <span style={{ marginLeft:6, padding:"1px 7px", background:"#EF4444", color:"white", borderRadius:99, fontSize:10, fontWeight:700 }}>2</span>}
+        {/* TABS */}
+        <div
+          style={{
+            background: "#FFFFFF",
+            borderRadius: 14,
+            border: "1px solid #E5E7EB",
+            padding: 5,
+            display: "flex",
+            gap: 5,
+            marginBottom: 20,
+          }}
+        >
+          {[
+            ["overview", "Overview"],
+            ["users", "Users"],
+            ["sessions", "Sessions"],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              onClick={() => setActiveTab(value)}
+              style={{
+                flex: 1,
+                border: "none",
+                borderRadius: 10,
+                padding: "11px 16px",
+                background:
+                  activeTab === value
+                    ? purple
+                    : "transparent",
+                color:
+                  activeTab === value
+                    ? "#FFFFFF"
+                    : "#6B7280",
+                fontWeight: 700,
+                cursor: "pointer",
+                fontSize: 13,
+              }}
+            >
+              {label}
             </button>
           ))}
         </div>
 
-        {/* OVERVIEW TAB */}
+        {/* OVERVIEW */}
         {activeTab === "overview" && (
           <>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 340px", gap:20, marginBottom:20 }}>
-              {/* Line chart */}
-              <div style={{ background:"white", borderRadius:16, padding:"24px", border:"1px solid #F3F4F6", boxShadow:"0 1px 8px rgba(0,0,0,0.04)" }}>
-                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:4 }}>
-                  <div>
-                    <p style={{ fontFamily:"'Space Grotesk',sans-serif", fontWeight:700, fontSize:16, color:"#111827" }}>Platform Growth</p>
-                    <p style={{ fontSize:12, color:"#9CA3AF" }}>Users & sessions over time</p>
-                  </div>
-                  <div style={{ display:"flex", gap:16 }}>
-                    <span style={{ fontSize:12, color:"#6B7280", display:"flex", alignItems:"center", gap:5 }}><span style={{ width:8, height:8, borderRadius:"50%", background:"#6C63FF", display:"inline-block" }}/> Users</span>
-                    <span style={{ fontSize:12, color:"#6B7280", display:"flex", alignItems:"center", gap:5 }}><span style={{ width:8, height:8, borderRadius:"50%", background:"#93C5FD", display:"inline-block" }}/> Sessions</span>
-                  </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "minmax(0, 1.5fr) minmax(280px, 1fr)",
+                gap: 20,
+                marginBottom: 20,
+              }}
+            >
+              {/* RECENT USERS */}
+              <div
+                style={{
+                  background: "#FFFFFF",
+                  border: "1px solid #E5E7EB",
+                  borderRadius: 16,
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    padding: "20px 22px",
+                    borderBottom:
+                      "1px solid #F3F4F6",
+                  }}
+                >
+                  <h3
+                    style={{
+                      margin: 0,
+                      fontSize: 17,
+                      fontWeight: 800,
+                    }}
+                  >
+                    Recent Users
+                  </h3>
+
+                  <p
+                    style={{
+                      margin: "5px 0 0",
+                      color: "#9CA3AF",
+                      fontSize: 12,
+                    }}
+                  >
+                    Latest registered users
+                  </p>
                 </div>
-                <LineChart/>
+
+                {stats.recentUsers.length === 0 ? (
+                  <EmptyState
+                    icon="👥"
+                    title="No users found"
+                    message="No registered users are available."
+                  />
+                ) : (
+                  <div>
+                    {stats.recentUsers.map((user) => (
+                      <div
+                        key={user.id}
+                        style={{
+                          padding: "15px 22px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          borderBottom:
+                            "1px solid #F3F4F6",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: "50%",
+                            background:
+                              "linear-gradient(135deg,#6C63FF,#8B5CF6)",
+                            color: "#FFFFFF",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontWeight: 800,
+                          }}
+                        >
+                          {user.full_name
+                            ?.charAt(0)
+                            .toUpperCase() || "?"}
+                        </div>
+
+                        <div style={{ flex: 1 }}>
+                          <p
+                            style={{
+                              margin: 0,
+                              fontSize: 14,
+                              fontWeight: 700,
+                            }}
+                          >
+                            {user.full_name}
+                          </p>
+
+                          <p
+                            style={{
+                              margin: "3px 0 0",
+                              color: "#9CA3AF",
+                              fontSize: 12,
+                            }}
+                          >
+                            {user.email}
+                          </p>
+                        </div>
+
+                        <span
+                          style={{
+                            color: "#9CA3AF",
+                            fontSize: 11,
+                          }}
+                        >
+                          {user.created_at
+                            ? new Date(
+                                user.created_at
+                              ).toLocaleDateString()
+                            : "—"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {/* Donut chart */}
-              <div style={{ background:"white", borderRadius:16, padding:"24px", border:"1px solid #F3F4F6", boxShadow:"0 1px 8px rgba(0,0,0,0.04)" }}>
-                <p style={{ fontFamily:"'Space Grotesk',sans-serif", fontWeight:700, fontSize:16, color:"#111827", marginBottom:16 }}>Skills by Category</p>
-                <div style={{ display:"flex", justifyContent:"center", marginBottom:16 }}>
-                  <DonutChart/>
+              {/* RECENT SKILLS */}
+              <div
+                style={{
+                  background: "#FFFFFF",
+                  border: "1px solid #E5E7EB",
+                  borderRadius: 16,
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    padding: "20px 22px",
+                    borderBottom:
+                      "1px solid #F3F4F6",
+                  }}
+                >
+                  <h3
+                    style={{
+                      margin: 0,
+                      fontSize: 17,
+                      fontWeight: 800,
+                    }}
+                  >
+                    Recent Skills
+                  </h3>
+
+                  <p
+                    style={{
+                      margin: "5px 0 0",
+                      color: "#9CA3AF",
+                      fontSize: 12,
+                    }}
+                  >
+                    Recently added skills
+                  </p>
                 </div>
-                {SKILL_CATS.map(c => (
-                  <div key={c.name} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-                    <span style={{ display:"flex", alignItems:"center", gap:8, fontSize:13, color:"#374151" }}>
-                      <span style={{ width:10, height:10, borderRadius:"50%", background:c.color, display:"inline-block" }}/>
-                      {c.name}
-                    </span>
-                    <span style={{ fontSize:13, fontWeight:600, color:"#111827" }}>{c.count.toLocaleString()}</span>
+
+                {stats.recentSkills.length === 0 ? (
+                  <EmptyState
+                    icon="🎯"
+                    title="No skills found"
+                    message="No skills have been added yet."
+                  />
+                ) : (
+                  <div>
+                    {stats.recentSkills.map(
+                      (skill) => (
+                        <div
+                          key={skill.id}
+                          style={{
+                            padding:
+                              "15px 22px",
+                            borderBottom:
+                              "1px solid #F3F4F6",
+                          }}
+                        >
+                          <p
+                            style={{
+                              margin: 0,
+                              fontSize: 14,
+                              fontWeight: 700,
+                            }}
+                          >
+                            {skill.name}
+                          </p>
+
+                          <p
+                            style={{
+                              margin:
+                                "4px 0 0",
+                              color:
+                                "#9CA3AF",
+                              fontSize: 12,
+                            }}
+                          >
+                            Added by{" "}
+                            {skill.full_name ||
+                              "Unknown user"}
+                          </p>
+                        </div>
+                      )
+                    )}
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
-            {/* Bottom metric cards */}
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:16 }}>
-              {[
-                { icon:"⚡", label:"Skill Score Avg.", value:"724", sub:"Platform-wide median", iconBg:"#EEF2FF", iconColor:"#6C63FF" },
-                { icon:"📊", label:"Exchange Rate",    value:"68%", sub:"Requests → sessions",  iconBg:"#ECFDF5", iconColor:"#10B981" },
-                { icon:"⚠️", label:"Open Reports",     value:"2",   sub:"1 high severity",       iconBg:"#FFFBEB", iconColor:"#F59E0B" },
-              ].map(m => (
-                <div key={m.label} style={{ background:"white", borderRadius:16, padding:"22px", border:"1px solid #F3F4F6", display:"flex", alignItems:"center", gap:16 }}>
-                  <div style={{ width:48, height:48, borderRadius:12, background:m.iconBg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 }}>{m.icon}</div>
-                  <div>
-                    <p style={{ fontSize:12, color:"#9CA3AF", marginBottom:4 }}>{m.label}</p>
-                    <p style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:26, fontWeight:800, color:"#111827", marginBottom:2 }}>{m.value}</p>
-                    <p style={{ fontSize:12, color:"#6B7280" }}>{m.sub}</p>
-                  </div>
-                </div>
-              ))}
+<div
+  style={{
+    display: "grid",
+    gridTemplateColumns: "2fr 1fr",
+    gap: 20,
+    marginTop: 20
+  }}
+>
+
+  {/* USER GROWTH */}
+  <div style={styles.card}>
+
+    <div style={styles.cardHeader}>
+
+      <div>
+        <h2>User Growth</h2>
+        <p>New user registrations over time</p>
+      </div>
+
+      <div
+        style={{
+          fontSize: 26,
+          background: "#eef2ff",
+          padding: "10px 12px",
+          borderRadius: 12
+        }}
+      >
+        📈
+      </div>
+
+    </div>
+
+    <UserGrowthChart
+      data={stats?.userGrowth || []}
+    />
+
+  </div>
+
+
+  {/* SKILLS */}
+  <div style={styles.card}>
+
+    <div style={styles.cardHeader}>
+
+      <div>
+        <h2>Skills by Category</h2>
+        <p>Skill distribution</p>
+      </div>
+
+      <div
+        style={{
+          fontSize: 26,
+          background: "#ecfeff",
+          padding: "10px 12px",
+          borderRadius: 12
+        }}
+      >
+        🎯
+      </div>
+
+    </div>
+
+    <SkillsCategoryChart
+      data={stats?.skillsByCategory || []}
+    />
+
+  </div>
+
+</div>
+
+<div
+  style={{
+    ...styles.card,
+    marginTop: 20
+  }}
+>
+
+  <div style={styles.cardHeader}>
+
+    <div>
+      <h2>Session Activity</h2>
+      <p>Current session status distribution</p>
+    </div>
+
+    <div
+      style={{
+        fontSize: 26,
+        background: "#f0fdf4",
+        padding: "10px 12px",
+        borderRadius: 12
+      }}
+    >
+      📊
+    </div>
+
+  </div>
+
+  <SessionsStatusChart
+    data={stats?.sessionsByStatus || []}
+  />
+
+</div>
+
+            {/* QUICK SUMMARY */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(3, minmax(0, 1fr))",
+                gap: 16,
+              }}
+            >
+              <div
+                style={{
+                  background: "#FFFFFF",
+                  border: "1px solid #E5E7EB",
+                  borderRadius: 16,
+                  padding: 22,
+                }}
+              >
+                <p
+                  style={{
+                    margin: "0 0 8px",
+                    color: "#6B7280",
+                    fontSize: 12,
+                    fontWeight: 600,
+                  }}
+                >
+                  User Accounts
+                </p>
+
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 25,
+                    fontWeight: 800,
+                  }}
+                >
+                  {users.length}
+                </h3>
+              </div>
+
+              <div
+                style={{
+                  background: "#FFFFFF",
+                  border: "1px solid #E5E7EB",
+                  borderRadius: 16,
+                  padding: 22,
+                }}
+              >
+                <p
+                  style={{
+                    margin: "0 0 8px",
+                    color: "#6B7280",
+                    fontSize: 12,
+                    fontWeight: 600,
+                  }}
+                >
+                  Completed Sessions
+                </p>
+
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 25,
+                    fontWeight: 800,
+                  }}
+                >
+                  {
+                    sessions.filter(
+                      (session) =>
+                        session.status ===
+                        "completed"
+                    ).length
+                  }
+                </h3>
+              </div>
+
+              <div
+                style={{
+                  background: "#FFFFFF",
+                  border: "1px solid #E5E7EB",
+                  borderRadius: 16,
+                  padding: 22,
+                }}
+              >
+                <p
+                  style={{
+                    margin: "0 0 8px",
+                    color: "#6B7280",
+                    fontSize: 12,
+                    fontWeight: 600,
+                  }}
+                >
+                  Barter Sessions
+                </p>
+
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 25,
+                    fontWeight: 800,
+                  }}
+                >
+                  {
+                    sessions.filter(
+                      (session) =>
+                        Number(session.is_barter) ===
+                        1
+                    ).length
+                  }
+                </h3>
+              </div>
             </div>
           </>
         )}
 
-        {/* USERS TAB */}
+        {/* USERS */}
         {activeTab === "users" && (
-          <div style={{ background:"white", borderRadius:16, border:"1px solid #F3F4F6", overflow:"hidden", boxShadow:"0 1px 8px rgba(0,0,0,0.04)" }}>
-            <div style={{ padding:"18px 24px", borderBottom:"1px solid #F3F4F6", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-              <p style={{ fontFamily:"'Space Grotesk',sans-serif", fontWeight:700, fontSize:16, color:"#111827" }}>All Users</p>
-              <input placeholder="Search users..." style={{ padding:"8px 14px", border:"1.5px solid #E5E7EB", borderRadius:8, fontSize:13, outline:"none", width:220 }}/>
+          <div
+            style={{
+              background: "#FFFFFF",
+              border: "1px solid #E5E7EB",
+              borderRadius: 16,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                padding: 20,
+                borderBottom:
+                  "1px solid #F3F4F6",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 15,
+              }}
+            >
+              <div>
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 17,
+                    fontWeight: 800,
+                  }}
+                >
+                  Users
+                </h3>
+
+                <p
+                  style={{
+                    margin: "4px 0 0",
+                    color: "#9CA3AF",
+                    fontSize: 12,
+                  }}
+                >
+                  {filteredUsers.length} users found
+                </p>
+              </div>
+
+              <input
+                value={search}
+                onChange={(event) =>
+                  setSearch(event.target.value)
+                }
+                placeholder="Search name, email or university..."
+                style={{
+                  width: 300,
+                  maxWidth: "100%",
+                  padding: "10px 13px",
+                  border: "1px solid #D1D5DB",
+                  borderRadius: 9,
+                  outline: "none",
+                  fontSize: 13,
+                }}
+              />
             </div>
-            <table style={{ width:"100%", borderCollapse:"collapse" }}>
-              <thead>
-                <tr style={{ background:"#F9FAFB" }}>
-                  {["User","Email","Role","Sessions","Status","Action"].map(h => (
-                    <th key={h} style={{ padding:"12px 16px", textAlign:"left", fontSize:12, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.05em" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {USERS.map((u,i) => (
-                  <tr key={i} style={{ borderTop:"1px solid #F3F4F6" }}
-                    onMouseEnter={e => e.currentTarget.style.background="#FAFAFA"}
-                    onMouseLeave={e => e.currentTarget.style.background="white"}>
-                    <td style={{ padding:"14px 16px" }}>
-                      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                        <div style={{ width:36, height:36, borderRadius:"50%", background:u.color, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Space Grotesk',sans-serif", fontWeight:700, fontSize:12, color:"white" }}>{u.avatar}</div>
-                        <span style={{ fontSize:14, fontWeight:600, color:"#111827" }}>{u.name}</span>
-                      </div>
-                    </td>
-                    <td style={{ padding:"14px 16px", fontSize:13, color:"#6B7280" }}>{u.email}</td>
-                    <td style={{ padding:"14px 16px" }}>
-                      <span style={{ padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:600, background:u.role==="Admin"?"#EEF2FF":"#F3F4F6", color:u.role==="Admin"?"#6C63FF":"#374151" }}>{u.role}</span>
-                    </td>
-                    <td style={{ padding:"14px 16px", fontSize:13, color:"#374151", fontWeight:600 }}>{u.sessions}</td>
-                    <td style={{ padding:"14px 16px" }}>
-                      <span style={{ padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:600, background:u.status==="Active"?"#ECFDF5":"#F3F4F6", color:u.status==="Active"?"#059669":"#9CA3AF" }}>{u.status}</span>
-                    </td>
-                    <td style={{ padding:"14px 16px" }}>
-                      <button style={{ padding:"5px 12px", background:"#F5F3FF", color:"#6C63FF", border:"1px solid #E9D5FF", borderRadius:8, fontSize:12, fontWeight:600, cursor:"pointer" }}>View</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+            {filteredUsers.length === 0 ? (
+              <EmptyState
+                icon="🔎"
+                title={
+                  search
+                    ? "No matching users"
+                    : "No users found"
+                }
+                message={
+                  search
+                    ? "Try another name, email or university."
+                    : "No registered users are available."
+                }
+              />
+            ) : (
+              <div
+                style={{
+                  overflowX: "auto",
+                }}
+              >
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse:
+                      "collapse",
+                    minWidth: 850,
+                  }}
+                >
+                  <thead>
+                    <tr
+                      style={{
+                        background: "#F9FAFB",
+                      }}
+                    >
+                      {[
+                        "User",
+                        "Email",
+                        "University",
+                        "Skill Score",
+                        "Sessions",
+                        "Joined",
+                        "Action",
+                      ].map((heading) => (
+                        <th
+                          key={heading}
+                          style={{
+                            padding:
+                              "13px 16px",
+                            textAlign: "left",
+                            fontSize: 11,
+                            color: "#6B7280",
+                            fontWeight: 800,
+                            textTransform:
+                              "uppercase",
+                          }}
+                        >
+                          {heading}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {filteredUsers.map(
+                      (user) => (
+                        <tr
+                          key={user.id}
+                          style={{
+                            borderTop:
+                              "1px solid #F3F4F6",
+                          }}
+                        >
+                          <td
+                            style={{
+                              padding:
+                                "14px 16px",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems:
+                                  "center",
+                                gap: 10,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: 36,
+                                  height: 36,
+                                  borderRadius:
+                                    "50%",
+                                  background:
+                                    "linear-gradient(135deg,#6C63FF,#8B5CF6)",
+                                  color:
+                                    "#FFFFFF",
+                                  display:
+                                    "flex",
+                                  alignItems:
+                                    "center",
+                                  justifyContent:
+                                    "center",
+                                  fontWeight:
+                                    800,
+                                  fontSize: 12,
+                                }}
+                              >
+                                {user.full_name
+                                  ?.charAt(
+                                    0
+                                  )
+                                  .toUpperCase() ||
+                                  "?"}
+                              </div>
+
+                              <span
+                                style={{
+                                  fontWeight:
+                                    700,
+                                  fontSize: 13,
+                                }}
+                              >
+                                {user.full_name ||
+                                  "—"}
+                              </span>
+                            </div>
+                          </td>
+
+                          <td
+                            style={{
+                              padding:
+                                "14px 16px",
+                              color: "#6B7280",
+                              fontSize: 13,
+                            }}
+                          >
+                            {user.email ||
+                              "—"}
+                          </td>
+
+                          <td
+                            style={{
+                              padding:
+                                "14px 16px",
+                              color: "#6B7280",
+                              fontSize: 13,
+                            }}
+                          >
+                            {user.university ||
+                              "—"}
+                          </td>
+
+                          <td
+                            style={{
+                              padding:
+                                "14px 16px",
+                              color: "#374151",
+                              fontSize: 13,
+                              fontWeight: 700,
+                            }}
+                          >
+                            {user.skill_score ??
+                              "—"}
+                          </td>
+
+                          <td
+                            style={{
+                              padding:
+                                "14px 16px",
+                              color: "#374151",
+                              fontSize: 13,
+                              fontWeight: 700,
+                            }}
+                          >
+                            {user.session_count ||
+                              0}
+                          </td>
+
+                          <td
+                            style={{
+                              padding:
+                                "14px 16px",
+                              color: "#9CA3AF",
+                              fontSize: 12,
+                            }}
+                          >
+                            {user.created_at
+                              ? new Date(
+                                  user.created_at
+                                ).toLocaleDateString()
+                              : "—"}
+                          </td>
+
+                          <td
+                            style={{
+                              padding:
+                                "14px 16px",
+                            }}
+                          >
+                            <button
+                              onClick={() =>
+                                setConfirmUser(
+                                  user
+                                )
+                              }
+                              style={{
+                                border:
+                                  "1px solid #FECACA",
+                                background:
+                                  "#FEF2F2",
+                                color:
+                                  "#DC2626",
+                                padding:
+                                  "7px 11px",
+                                borderRadius: 8,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                cursor:
+                                  "pointer",
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
-        {/* SKILLS TAB */}
-        {activeTab === "skills" && (
-          <div style={{ background:"white", borderRadius:16, padding:"24px", border:"1px solid #F3F4F6" }}>
-            <p style={{ fontFamily:"'Space Grotesk',sans-serif", fontWeight:700, fontSize:16, color:"#111827", marginBottom:20 }}>Skills by Category</p>
-            <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-              {SKILL_CATS.map(c => (
-                <div key={c.name}>
-                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
-                    <span style={{ fontSize:14, fontWeight:600, color:"#374151" }}>{c.name}</span>
-                    <span style={{ fontSize:14, fontWeight:700, color:c.color }}>{c.count.toLocaleString()} skills</span>
-                  </div>
-                  <div style={{ height:8, background:"#F3F4F6", borderRadius:4, overflow:"hidden" }}>
-                    <div style={{ height:"100%", width:`${(c.count/1240)*100}%`, background:c.color, borderRadius:4 }}/>
-                  </div>
-                </div>
-              ))}
+        {/* SESSIONS */}
+        {activeTab === "sessions" && (
+          <div
+            style={{
+              background: "#FFFFFF",
+              border: "1px solid #E5E7EB",
+              borderRadius: 16,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                padding: 20,
+                borderBottom:
+                  "1px solid #F3F4F6",
+              }}
+            >
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: 17,
+                  fontWeight: 800,
+                }}
+              >
+                Sessions
+              </h3>
+
+              <p
+                style={{
+                  margin: "4px 0 0",
+                  color: "#9CA3AF",
+                  fontSize: 12,
+                }}
+              >
+                {sessions.length} sessions
+              </p>
             </div>
+
+            {sessions.length === 0 ? (
+              <EmptyState
+                icon="📅"
+                title="No sessions found"
+                message="Sessions will appear when users book sessions."
+              />
+            ) : (
+              <div
+                style={{
+                  overflowX: "auto",
+                }}
+              >
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse:
+                      "collapse",
+                    minWidth: 800,
+                  }}
+                >
+                  <thead>
+                    <tr
+                      style={{
+                        background: "#F9FAFB",
+                      }}
+                    >
+                      {[
+                        "Student",
+                        "Tutor",
+                        "Skill",
+                        "Date",
+                        "Type",
+                        "Status",
+                      ].map((heading) => (
+                        <th
+                          key={heading}
+                          style={{
+                            padding:
+                              "13px 16px",
+                            textAlign: "left",
+                            fontSize: 11,
+                            color: "#6B7280",
+                            fontWeight: 800,
+                            textTransform:
+                              "uppercase",
+                          }}
+                        >
+                          {heading}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {sessions.map(
+                      (session) => (
+                        <tr
+                          key={session.id}
+                          style={{
+                            borderTop:
+                              "1px solid #F3F4F6",
+                          }}
+                        >
+                          <td
+                            style={{
+                              padding:
+                                "14px 16px",
+                              fontSize: 13,
+                              fontWeight: 700,
+                            }}
+                          >
+                            {session.student_name ||
+                              "—"}
+                          </td>
+
+                          <td
+                            style={{
+                              padding:
+                                "14px 16px",
+                              fontSize: 13,
+                              color:
+                                "#6B7280",
+                            }}
+                          >
+                            {session.tutor_name ||
+                              "—"}
+                          </td>
+
+                          <td
+                            style={{
+                              padding:
+                                "14px 16px",
+                              fontSize: 13,
+                              color:
+                                "#6B7280",
+                            }}
+                          >
+                            {session.skill_name ||
+                              "—"}
+                          </td>
+
+                          <td
+                            style={{
+                              padding:
+                                "14px 16px",
+                              fontSize: 12,
+                              color:
+                                "#9CA3AF",
+                            }}
+                          >
+                            {session.scheduled_at
+                              ? new Date(
+                                  session.scheduled_at
+                                ).toLocaleDateString()
+                              : "—"}
+                          </td>
+
+                          <td
+                            style={{
+                              padding:
+                                "14px 16px",
+                            }}
+                          >
+                            <span
+                              style={{
+                                padding:
+                                  "5px 9px",
+                                borderRadius:
+                                  999,
+                                background:
+                                  Number(
+                                    session.is_barter
+                                  ) === 1
+                                    ? "#ECFDF5"
+                                    : "#EEF2FF",
+                                color:
+                                  Number(
+                                    session.is_barter
+                                  ) === 1
+                                    ? "#059669"
+                                    : "#4F46E5",
+                                fontSize: 11,
+                                fontWeight: 700,
+                              }}
+                            >
+                              {Number(
+                                session.is_barter
+                              ) === 1
+                                ? "Barter"
+                                : "Paid"}
+                            </span>
+                          </td>
+
+                          <td
+                            style={{
+                              padding:
+                                "14px 16px",
+                            }}
+                          >
+                            <StatusBadge
+                              status={
+                                session.status
+                              }
+                            />
+                          </td>
+                        </tr>
+                      )
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
-        {/* REPORTS TAB */}
-        {activeTab === "reports" && (
-          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-            {[
-              { title:"Spam content report", user:"Marcus Chen", severity:"High", time:"2 hours ago", status:"Open" },
-              { title:"Inappropriate session behaviour", user:"Unknown User", severity:"Medium", time:"1 day ago", status:"Open" },
-              { title:"Fake profile detected", user:"System Flag", severity:"Low", time:"3 days ago", status:"Resolved" },
-            ].map((r,i) => (
-              <div key={i} style={{ background:"white", borderRadius:14, padding:"20px 24px", border:"1px solid #F3F4F6", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                <div>
-                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:4 }}>
-                    <p style={{ fontWeight:700, fontSize:14, color:"#111827" }}>{r.title}</p>
-                    <span style={{ padding:"2px 8px", borderRadius:99, fontSize:10, fontWeight:700, background:r.severity==="High"?"#FEF2F2":r.severity==="Medium"?"#FFFBEB":"#F3F4F6", color:r.severity==="High"?"#DC2626":r.severity==="Medium"?"#D97706":"#6B7280" }}>{r.severity}</span>
-                  </div>
-                  <p style={{ fontSize:12, color:"#9CA3AF" }}>Reported by {r.user} · {r.time}</p>
-                </div>
-                <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                  <span style={{ padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:600, background:r.status==="Open"?"#FEF2F2":"#ECFDF5", color:r.status==="Open"?"#DC2626":"#059669" }}>{r.status}</span>
-                  {r.status==="Open" && <button style={{ padding:"6px 14px", background:"#6C63FF", color:"white", border:"none", borderRadius:8, fontSize:12, fontWeight:600, cursor:"pointer" }}>Resolve</button>}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Footer */}
-        <footer style={{ marginTop:40, background:"white", borderRadius:16, padding:"36px 32px 20px" }}>
-          <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr 1fr", gap:40, marginBottom:28 }}>
-            <div>
-              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
-                <div style={{ width:28, height:28, borderRadius:8, background:"linear-gradient(135deg,#6C63FF,#4F46E5)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13 }}>⚡</div>
-                <span style={{ fontFamily:"'Space Grotesk',sans-serif", fontWeight:700, fontSize:16, color:"#111827" }}>SkillSync</span>
-              </div>
-              <p style={{ fontSize:13, color:"#9CA3AF", lineHeight:1.6 }}>The premier platform for peer-to-peer skill exchange and mentorship.</p>
-            </div>
-            {[
-              { title:"Platform", links:["Browse Skills","Find Mentors","How It Works","Pricing"] },
-              { title:"Company",  links:["About Us","Blog","Careers","Press"] },
-              { title:"Support",  links:["Help Center","Community","Contact Us","Status"] },
-            ].map(col => (
-              <div key={col.title}>
-                <p style={{ fontWeight:700, fontSize:13, color:"#111827", marginBottom:14 }}>{col.title}</p>
-                {col.links.map(l => (
-                  <p key={l} style={{ fontSize:13, color:"#9CA3AF", marginBottom:10, cursor:"pointer" }}
-                    onMouseEnter={e => e.target.style.color="#6C63FF"}
-                    onMouseLeave={e => e.target.style.color="#9CA3AF"}
-                  >{l}</p>
-                ))}
-              </div>
-            ))}
-          </div>
-          <div style={{ borderTop:"1px solid #F3F4F6", paddingTop:18, display:"flex", justifyContent:"space-between" }}>
-            <p style={{ fontSize:12, color:"#9CA3AF" }}>© 2026 SkillSync. All rights reserved.</p>
-            <div style={{ display:"flex", gap:20 }}>
-              {["Privacy","Terms","Cookies"].map(l => <p key={l} style={{ fontSize:12, color:"#9CA3AF", cursor:"pointer" }}>{l}</p>)}
-            </div>
-          </div>
-        </footer>
+        {/* FOOTER */}
+        <div
+          style={{
+            textAlign: "center",
+            marginTop: 35,
+            color: "#9CA3AF",
+            fontSize: 12,
+          }}
+        >
+          SkillSync Admin Dashboard • 2026
+        </div>
       </div>
+
+      {/* DELETE MODAL */}
+      {confirmUser && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background:
+              "rgba(17,24,39,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              background: "#FFFFFF",
+              width: "100%",
+              maxWidth: 420,
+              borderRadius: 16,
+              padding: 25,
+              boxShadow:
+                "0 20px 50px rgba(0,0,0,0.2)",
+            }}
+          >
+            <h2
+              style={{
+                margin: "0 0 8px",
+                fontSize: 19,
+                fontWeight: 800,
+              }}
+            >
+              Delete User?
+            </h2>
+
+            <p
+              style={{
+                margin: "0 0 22px",
+                color: "#6B7280",
+                fontSize: 14,
+                lineHeight: 1.6,
+              }}
+            >
+              Are you sure you want to delete{" "}
+              <strong>
+                {confirmUser.full_name}
+              </strong>
+              ? This action cannot be undone.
+            </p>
+
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+              }}
+            >
+              <button
+                onClick={() =>
+                  setConfirmUser(null)
+                }
+                style={{
+                  flex: 1,
+                  padding: 11,
+                  border:
+                    "1px solid #D1D5DB",
+                  background: "#FFFFFF",
+                  borderRadius: 9,
+                  cursor: "pointer",
+                  fontWeight: 700,
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleDelete}
+                style={{
+                  flex: 1,
+                  padding: 11,
+                  border: "none",
+                  background: "#DC2626",
+                  color: "#FFFFFF",
+                  borderRadius: 9,
+                  cursor: "pointer",
+                  fontWeight: 700,
+                }}
+              >
+                Delete User
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,32 +1,72 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const path = require("path");
+const messagesRoute = require("./routes/messages");
 
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, ".env") });
 
 const app = express();
 
-// ── Middleware ──
-app.use(cors(
-    { origin: "http://localhost:3005", credentials: true }
-));
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+app.use(cors({ origin: "http://localhost:5173", credentials: true }));
+app.use(express.json({ limit: "10mb" }));
 
-// ── Routes ──
-// app.use("/api/auth",     require("./routes/auth"));
-// app.use("/api/users",    require("./routes/users"));
-// app.use("/api/skills",   require("./routes/skills"));
-// app.use("/api/sessions", require("./routes/sessions"));
-// app.use("/api/reviews",  require("./routes/reviews"));
-// app.use("/api/match",    require("./routes/match"));
-// app.use("/api/admin",    require("./routes/admin"));
+// Load routes one by one with error checking
+const authRoute     = require("./routes/auth");
+const usersRoute    = require("./routes/users");
+const skillsRoute   = require("./routes/skills");
+const sessionsRoute = require("./routes/sessions");
+const reviewsRoute  = require("./routes/reviews");
+const matchRoute    = require("./routes/match");
+const adminRoute    = require("./routes/admin");
+const checkAuthRoute = require("./routes/Checkauth");
+const notificationRoutes = require("./routes/notifications");
 
-// ── Health check ──
+
+console.log("auth type:",     typeof authRoute);
+console.log("users type:",    typeof usersRoute);
+console.log("skills type:",   typeof skillsRoute);
+console.log("sessions type:", typeof sessionsRoute);
+console.log("reviews type:",  typeof reviewsRoute);
+console.log("match type:",    typeof matchRoute);
+console.log("admin type:",    typeof adminRoute);
+console.log("checkauth type:", typeof checkAuthRoute);
+
+app.use("/api/auth",     authRoute);
+app.use("/api/users",    usersRoute);
+app.use("/api/skills",   skillsRoute);
+app.use("/api/sessions", sessionsRoute);
+app.use("/api/reviews",  reviewsRoute);
+app.use("/api/match",    matchRoute);
+app.use("/api/admin",    adminRoute);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/messages", messagesRoute);
+
+app.use("/check", checkAuthRoute)
+
 app.get("/", (req, res) => res.json({ message: "SkillSync API running ✅" }));
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () =>
-     console.log(`SkillSync server running on port ${PORT}`
+app.get("/api/test-email", async (req, res) => {
+  try {
+    const result = await require("./utils/sendEmail").sendEmail({
+      to: process.env.TEST_EMAIL || process.env.FROM_EMAIL || "onboarding@resend.dev",
+      subject: "SkillSync test email",
+      html: "<p>This is a test email from SkillSync using Resend.</p>"
+    });
+    res.json({ success: true, message: "Email sent successfully", result });
+  } catch (error) {
+    console.error("Test email failed:", error);
+    res.status(500).json({ success: false, message: error.message || "Email sending failed" });
+  }
+});
 
-     ));
+const PORT = process.env.PORT || 5000;
+
+// Start auto-reject cron job
+const startAutoRejectCron = require("./config/cron");
+
+startAutoRejectCron();
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});

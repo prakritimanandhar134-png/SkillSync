@@ -1,6 +1,6 @@
 const express = require("express");
 const router  = express.Router();
-const db      = require("../config/db");
+const { pool }  = require("../config/db");
 const { verifyAdmin } = require("../middleware/auth");
 
 // All admin routes are protected by verifyAdmin middleware
@@ -9,15 +9,127 @@ const { verifyAdmin } = require("../middleware/auth");
 // GET /api/admin/stats
 router.get("/stats", verifyAdmin, async (req, res) => {
   try {
-    const [[{ total_users }]]    = await db.query("SELECT COUNT(*) AS total_users FROM users WHERE role='user'");
-    const [[{ total_skills }]]   = await db.query("SELECT COUNT(*) AS total_skills FROM skills");
-    const [[{ sessions_today }]] = await db.query("SELECT COUNT(*) AS sessions_today FROM sessions WHERE DATE(created_at) = CURDATE()");
-    const [[{ avg_rating }]]     = await db.query("SELECT ROUND(AVG(rating),1) AS avg_rating FROM reviews");
-    const [[{ exchange_rate }]]  = await db.query("SELECT ROUND(COUNT(CASE WHEN is_barter=1 THEN 1 END)/COUNT(*)*100) AS exchange_rate FROM sessions");
+    // ==============================
+    // BASIC COUNTS
+    // ==============================
 
-    res.json({ total_users, total_skills, sessions_today, avg_rating, exchange_rate });
+    const [[{ total_users }]] = await pool.query(`
+      SELECT COUNT(*) AS total_users
+      FROM users
+      WHERE role = 'user'
+    `);
+
+    const [[{ total_skills }]] = await pool.query(`
+      SELECT COUNT(*) AS total_skills
+      FROM skills
+    `);
+
+    const [[{ total_sessions }]] = await pool.query(`
+      SELECT COUNT(*) AS total_sessions
+      FROM sessions
+    `);
+
+    const [[{ pending_sessions }]] = await pool.query(`
+      SELECT COUNT(*) AS pending_sessions
+      FROM sessions
+      WHERE status = 'pending'
+    `);
+
+
+    // ==============================
+    // RECENT USERS
+    // ==============================
+
+    const [recentUsers] = await pool.query(`
+      SELECT
+        id,
+        full_name,
+        email,
+        created_at
+      FROM users
+      WHERE role = 'user'
+      ORDER BY created_at DESC
+      LIMIT 5
+    `);
+
+
+    // ==============================
+    // RECENT SKILLS
+    // ==============================
+
+    const [recentSkills] = await pool.query(`
+      SELECT
+        id,
+        name,
+        category,
+        created_at
+      FROM skills
+      ORDER BY created_at DESC
+      LIMIT 5
+    `);
+
+    // User growth by month
+    const [userGrowth] = await pool.query(`
+      SELECT
+        DATE_FORMAT(created_at, '%Y-%m') AS month,
+        COUNT(*) AS count
+      FROM users
+      WHERE role = 'user'
+      GROUP BY DATE_FORMAT(created_at, '%Y-%m')
+      ORDER BY month ASC
+    `);
+
+    // Skills grouped by category
+    const [skillsByCategory] = await pool.query(`
+      SELECT
+        category,
+        COUNT(*) AS count
+      FROM skills
+      GROUP BY category
+      ORDER BY count DESC
+    `);
+
+    // Sessions grouped by status
+    const [sessionsByStatus] = await pool.query(`
+      SELECT
+        status,
+        COUNT(*) AS count
+      FROM sessions
+      GROUP BY status
+      ORDER BY count DESC
+    `);
+     
+    
+
+    // ==============================
+    // RESPONSE
+    // ==============================
+   console.log("USER GROWTH:", userGrowth);
+console.log("SKILLS BY CATEGORY:", skillsByCategory);
+console.log("SESSIONS BY STATUS:", sessionsByStatus);
+
+    res.json({
+      total_users: Number(total_users),
+      total_skills: Number(total_skills),
+      total_sessions: Number(total_sessions),
+      pending_sessions: Number(pending_sessions),
+
+      recentUsers,
+      recentSkills,
+
+      skillsByCategory,
+      sessionsByStatus,
+      userGrowth
+    });
+
   } catch (err) {
-    res.status(500).json({ message: "Server error." });
+
+    console.error("ADMIN STATS ERROR:", err);
+
+    res.status(500).json({
+      message: "Server error.",
+      error: err.message
+    });
   }
 });
 
@@ -25,7 +137,7 @@ router.get("/stats", verifyAdmin, async (req, res) => {
 // GET /api/admin/users
 router.get("/users", verifyAdmin, async (req, res) => {
   try {
-    const [users] = await db.query(`
+    const [users] = await pool.query(`
       SELECT u.id, u.full_name, u.email, u.role, u.university,
              u.skill_score, u.created_at,
              COUNT(DISTINCT s.id) AS session_count
@@ -36,18 +148,26 @@ router.get("/users", verifyAdmin, async (req, res) => {
     `);
     res.json(users);
   } catch (err) {
-    res.status(500).json({ message: "Server error." });
-  }
+  console.error("ADMIN USERS ERROR:", err);
+  res.status(500).json({
+    message: "Server error.",
+    error: err.message
+  });
+}
 });
 
 // ── DELETE a user ─────────────────────────────
 // DELETE /api/admin/users/:id
 router.delete("/users/:id", verifyAdmin, async (req, res) => {
   try {
-    await db.query("DELETE FROM users WHERE id = ? AND role != 'admin'", [req.params.id]);
+    await pool.query("DELETE FROM users WHERE id = ? AND role != 'admin'", [req.params.id]);
     res.json({ message: "User deleted." });
   } catch (err) {
-    res.status(500).json({ message: "Server error." });
+    console.error("ADMIN DELETE USER ERROR:", err);
+    res.status(500).json({
+      message: "Server error.",
+      error: err.message
+    });
   }
 });
 
@@ -55,7 +175,7 @@ router.delete("/users/:id", verifyAdmin, async (req, res) => {
 // GET /api/admin/sessions
 router.get("/sessions", verifyAdmin, async (req, res) => {
   try {
-    const [sessions] = await db.query(`
+    const [sessions] = await pool.query(`
       SELECT s.*, sk.name AS skill_name,
              t.full_name AS tutor_name,
              st.full_name AS student_name
@@ -68,8 +188,13 @@ router.get("/sessions", verifyAdmin, async (req, res) => {
     `);
     res.json(sessions);
   } catch (err) {
-    res.status(500).json({ message: "Server error." });
-  }
-});
+  console.error("ADMIN SESSIONS ERROR:", err);
+  res.status(500).json({
+    message: "Server error.",
+    error: err.message
+  });
+}
+  });
 
 module.exports = router;
+
