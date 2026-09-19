@@ -94,7 +94,7 @@ export default function RegisterPage({ navigate, onRegister }) {
     console.error("🔥 ACTUAL REGISTER ERROR:", err);
 
     setServerError(
-      err?.message || "Registration failed."
+      err?.message || "Registration failed...."
     );
   } finally {
     setLoading(false);
