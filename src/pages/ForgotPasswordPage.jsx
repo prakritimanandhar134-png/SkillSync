@@ -59,11 +59,12 @@ export default function ForgotPasswordPage({ navigate }) {
   try {
     const data = await verifyOTP(email, otp);
 
-    if (data.reset_token) {
-      navigate("reset-password", data.reset_token);
-    } else {
-      setError(data.message || "Invalid OTP");
-    }
+   if (data.reset_token) {
+  navigate(`/reset-password/${data.reset_token}`);
+} else {
+  setError(data.message || "Invalid OTP");
+}
+
   } catch (err) {
     setError("Server error.");
   } finally {

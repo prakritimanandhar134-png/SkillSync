@@ -176,12 +176,12 @@ router.get("/my", verifyToken, async (req, res) => {
 
 router.post("/my", verifyToken, async (req, res) => {
 
-  const {
-    skill_id,
-    type,
-    level,
-  } = req.body;
-
+const {
+  skill_id,
+  type,
+  level,
+  hourly_rate
+} = req.body;
 
   if (!skill_id || !type) {
     return res.status(400).json({
@@ -234,28 +234,29 @@ router.post("/my", verifyToken, async (req, res) => {
       ];
 
 
-      const proficiency =
-        allowedLevels.includes(level)
-          ? level
-          : "Beginner";
+    const proficiency =
+  allowedLevels.includes(level)
+    ? level
+    : "Beginner";
 
-
-      await pool.query(
-        `
-        INSERT INTO user_skills_teach
-        (
-          user_id,
-          skill_id,
-          proficiency
-        )
-        VALUES (?, ?, ?)
-        `,
-        [
-          req.user.id,
-          skill_id,
-          proficiency,
-        ]
-      );
+     await pool.query(
+  `
+  INSERT INTO user_skills_teach
+  (
+    user_id,
+    skill_id,
+    proficiency,
+    hourly_rate
+  )
+  VALUES (?, ?, ?, ?)
+  `,
+  [
+    req.user.id,
+    skill_id,
+    proficiency,
+    Number(hourly_rate || 0)
+  ]
+);
 
 
       return res.json({

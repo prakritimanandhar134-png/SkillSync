@@ -142,19 +142,22 @@ router.get(
 
       const [users] = await pool.query(
         `
-        SELECT
-          u.id,
-          u.full_name,
-          u.email,
-          u.university,
-          u.year,
-          u.bio,
-          u.location,
-          u.avatar_url,
-          u.skill_score,
-          u.is_online,
-          u.created_at,
-
+       SELECT
+  u.id,
+  u.full_name,
+  u.email,
+  u.university,
+  u.year,
+  u.bio,
+  u.location,
+  u.avatar_url,
+  u.skill_score,
+  u.is_online,
+  u.available_days,
+u.class_start_time,
+u.class_end_time,
+u.hours_per_day,
+u.created_at,
           ROUND(
             AVG(DISTINCT r.rating),
             1
@@ -179,17 +182,18 @@ router.get(
           AND u.role = 'user'
 
         GROUP BY
-          u.id,
-          u.full_name,
-          u.email,
-          u.university,
-          u.year,
-          u.bio,
-          u.location,
-          u.avatar_url,
-          u.skill_score,
-          u.is_online,
-          u.created_at
+         u.id,
+  u.full_name,
+  u.email,
+  u.university,
+  u.year,
+  u.bio,
+  u.location,
+  u.avatar_url,
+  u.skill_score,
+  u.is_online,
+  u.available_days,
+  u.created_at 
 
         `,
         [myId]
@@ -263,6 +267,7 @@ router.get(
               Number(skill.skill_id)
             );
 
+            
           console.log(
             `User ${user.id} teaches:`,
             theirTeachIds,
@@ -282,6 +287,31 @@ router.get(
               theirWantIds
             );
 
+// ══════════════════════════════════════════
+// RELEVANCE CHECK
+// ══════════════════════════════════════════
+
+// Can they teach me something I want to learn?
+const theyCanTeachMe =
+  theirTeachIds.some((id) =>
+    myWantIds.includes(id)
+  );
+
+// Can I teach them something they want to learn?
+const iCanTeachThem =
+  myTeachIds.some((id) =>
+    theirWantIds.includes(id)
+  );
+
+// Both users can teach each other
+const barter =
+  theyCanTeachMe && iCanTeachThem;
+
+// If there is no skill connection at all,
+// don't recommend this user
+if (!theyCanTeachMe && !iCanTeachThem) {
+  return null;
+}            
           // ══════════════════════════════════════════
           // RECOMMENDATION SCORE
           // ══════════════════════════════════════════
@@ -294,34 +324,51 @@ router.get(
               user.is_online
             );
 
-          // ══════════════════════════════════════════
-          // BARTER CHECK
-          // ══════════════════════════════════════════
+         let availableDays = [];
 
-          const barter =
-            theirTeachIds.some((id) =>
-              myWantIds.includes(id)
-            ) &&
-            myTeachIds.some((id) =>
-              theirWantIds.includes(id)
-            );
+try {
+  if (user.available_days) {
+    availableDays =
+      typeof user.available_days === "string"
+        ? JSON.parse(user.available_days)
+        : user.available_days;
+  }
+} catch (err) {
+  console.error(
+    `Invalid available_days for user ${user.id}:`,
+    user.available_days
+  );
 
+  availableDays = [];
+}
           // ══════════════════════════════════════════
           // RETURN USER DATA
           // ══════════════════════════════════════════
 
           return {
             id: user.id,
-            full_name: user.full_name,
-            email: user.email,
-            university: user.university,
-            year: user.year,
-            bio: user.bio,
-            location: user.location,
-            avatar_url: user.avatar_url,
-            skill_score: user.skill_score,
-            is_online: user.is_online,
-            created_at: user.created_at,
+  full_name: user.full_name,
+  email: user.email,
+  university: user.university,
+  year: user.year,
+  bio: user.bio,
+  location: user.location,
+  avatar_url: user.avatar_url,
+  skill_score: user.skill_score,
+  is_online: user.is_online,
+  available_days: availableDays,
+
+schedule: {
+  startTime: user.class_start_time,
+  endTime: user.class_end_time,
+  hoursPerDay: Number(user.hours_per_day || 0),
+  availableDays: availableDays
+},
+
+
+  created_at: user.created_at,
+
+           
 
             // Rating
             avg_rating: user.avg_rating,
@@ -403,21 +450,25 @@ router.get(
         })
       );
 
+      // Remove users who have no relevant skill connection
+      const filteredResults =
+        results.filter((user) => user !== null);
+
       // ════════════════════════════════════════════════
       // 5. SORT BEST MATCH FIRST
       // ════════════════════════════════════════════════
 
-      results.sort(
-        (a, b) =>
-          b.recommend_score -
-          a.recommend_score
-      );
+     filteredResults.sort(
+  (a, b) =>
+    b.recommend_score -
+    a.recommend_score
+);
 
       // ════════════════════════════════════════════════
       // 6. SEND RESULTS
       // ════════════════════════════════════════════════
 
-      res.json(results);
+      res.json(filteredResults);
 
     } catch (err) {
       console.error(
@@ -523,6 +574,13 @@ router.get(
           Number(skill.skill_id)
         );
 
+        // No skills = no recommendations
+if (
+  myTeachIds.length === 0 &&
+  myWantIds.length === 0
+) {
+  return res.json([]);
+}
       const theirTeachIds =
         theirTeachRows.map((skill) =>
           Number(skill.skill_id)
@@ -532,7 +590,28 @@ router.get(
         theirLearnRows.map((skill) =>
           Number(skill.skill_id)
         );
+const theyCanTeachMe =
+  theirTeachIds.some((id) =>
+    myWantIds.includes(id)
+  );
 
+const iCanTeachThem =
+  myTeachIds.some((id) =>
+    theirWantIds.includes(id)
+  );
+
+// Both users can teach each other
+const barter =
+  theyCanTeachMe && iCanTeachThem;
+
+// User is relevant only if there is
+// at least one actual skill connection
+if (!theyCanTeachMe && !iCanTeachThem) {
+  return res.json({
+    barter_ready: false,
+    match_score: 0
+  });
+}
       // ══════════════════════════════════════════════
       // MATCH SCORE
       // ══════════════════════════════════════════════
@@ -545,17 +624,7 @@ router.get(
           theirWantIds
         );
 
-      // ══════════════════════════════════════════════
-      // BARTER CHECK
-      // ══════════════════════════════════════════════
-
-      const barter =
-        theirTeachIds.some((id) =>
-          myWantIds.includes(id)
-        ) &&
-        myTeachIds.some((id) =>
-          theirWantIds.includes(id)
-        );
+    
 
       // ══════════════════════════════════════════════
       // RETURN RESULT

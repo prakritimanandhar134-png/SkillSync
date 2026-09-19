@@ -53,6 +53,22 @@ export const getAllUsers = async () => {
   return res.json();
 };
 
+// Get unread message counts
+export const getUnreadMessageCounts = async () => {
+  const res = await fetch(`${BASE_URL}/messages/unread/counts`, {
+    method: "GET",
+    headers: authHeaders(),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.message || "Failed to load unread counts.");
+  }
+
+  return data;
+};
+
 // Get single user
 export const getUserById = async (id) => {
   const res = await fetch(`${BASE_URL}/users/${id}`, {
@@ -149,6 +165,28 @@ export const getPendingSessions = async () => {
   return res.json();
 };
 
+// Get my notifications
+export const getNotifications = async () => {
+  const res = await fetch(`${BASE_URL}/notifications`, {
+    headers: authHeaders(),
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch notifications");
+  }
+
+  return res.json();
+};
+
+// Mark notification as read
+export const markNotificationRead = async (id) => {
+  const res = await fetch(`${BASE_URL}/notifications/${id}/read`, {
+    method: "PUT",
+    headers: authHeaders(),
+  });
+
+  return res.json();
+};
 // Accept session
 export const acceptSession = async (id) => {
   const res = await fetch(`${BASE_URL}/sessions/${id}/accept`, {
@@ -168,28 +206,115 @@ export const rejectSession = async (id, reason) => {
   return res.json();
 };
 
+export const completeSession = async (sessionId) => {
+  const response = await fetch(
+    `${BASE_URL}/sessions/${sessionId}/complete`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to complete session.");
+  }
+
+  return data;
+};
+
 // ════════════════════════════════
 //  REVIEWS
 // ════════════════════════════════
 
-// Submit review
-export const submitReview = async (data) => {
+// Submit review for a completed session
+export const submitReview = async ({
+  session_id,
+  rating,
+  comment = "",
+}) => {
   const res = await fetch(`${BASE_URL}/reviews`, {
     method: "POST",
     headers: authHeaders(),
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      session_id,
+      rating,
+      comment,
+    }),
   });
-  return res.json();
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(
+      data.message || "Failed to submit review."
+    );
+  }
+
+  return data;
 };
 
-// Get reviews for a user
+// Get reviews received by a user
 export const getUserReviews = async (id) => {
-  const res = await fetch(`${BASE_URL}/reviews/user/${id}`, {
-    headers: authHeaders(),
-  });
-  return res.json();
+  const res = await fetch(
+    `${BASE_URL}/reviews/user/${id}`
+  );
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(
+      data.message || "Failed to fetch user reviews."
+    );
+  }
+
+  return data;
 };
 
+// Get average rating and review count
+export const getUserRating = async (id) => {
+  const res = await fetch(
+    `${BASE_URL}/reviews/user/${id}/summary`
+  );
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(
+      data.message || "Failed to fetch rating summary."
+    );
+  }
+
+  return data;
+};
+
+// Check whether the current student already reviewed a session
+export const getSessionReview = async (sessionId) => {
+  const res = await fetch(
+    `${BASE_URL}/reviews/session/${sessionId}`,
+    {
+      headers: authHeaders(),
+    }
+  );
+
+  if (res.status === 404) {
+    return null;
+  }
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(
+      data.message || "Failed to check session review."
+    );
+  }
+
+  return data;
+};
 // ════════════════════════════════
 //  MATCH & RECOMMENDATIONS
 // ════════════════════════════════
@@ -299,3 +424,76 @@ export const uploadAvatar = async (avatar_url) => {
   return res.json();
 };
 
+// ─────────────────────────────────────────────
+// CHAT / MESSAGES
+// ─────────────────────────────────────────────
+
+export const getMessages = async (userId) => {
+  const response = await fetch(
+    `${BASE_URL}/messages/${userId}`,
+    {
+      method: "GET",
+      headers: authHeaders(),
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data.message || "Failed to load messages."
+    );
+  }
+
+  return data;
+};
+
+export const sendMessage = async ({
+  receiver_id,
+  message,
+}) => {
+  const response = await fetch(
+    `${BASE_URL}/messages`,
+    {
+      method: "POST",
+      headers: {
+        ...authHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        receiver_id,
+        message,
+      }),
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data.message || "Failed to send message."
+    );
+  }
+
+  return data;
+};
+
+export const markMessagesAsRead = async (userId) => {
+  const response = await fetch(
+    `${BASE_URL}/messages/${userId}/read`,
+    {
+      method: "PATCH",
+      headers: authHeaders(),
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data.message || "Failed to mark messages as read."
+    );
+  }
+
+  return data;
+};

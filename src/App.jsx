@@ -22,6 +22,7 @@ import AdminPage from "./pages/AdminPage";
 
 import Navbar from "./components/Navbar";
 import ChatBox from "./components/ChatBox";
+import Toast from "./components/Toast";
 import usestore from "./zustand/Zustand";
 
 
@@ -49,8 +50,14 @@ function ProtectedRoute({ adminOnly = false }) {
 
   const userRole = role || parsedUser.role;
 
+  // Admin-only route
   if (adminOnly && userRole !== "admin") {
     return <Navigate to="/dashboard" replace />;
+  }
+
+  // Normal-user routes should NOT be accessible by admin
+  if (!adminOnly && userRole === "admin") {
+    return <Navigate to="/admin" replace />;
   }
 
   return <Outlet />;
@@ -63,13 +70,28 @@ function AppLayout() {
   const navigate = useNavigate();
 
   const [chatOpen, setChatOpen] = useState(false);
+  const [toast, setToast] = useState(null);
 
+ const showToast = (message, type = "success") => {
+  setToast({
+    message,
+    type,
+  });
+
+  setTimeout(() => {
+    setToast(null);
+  }, 3000);
+};
   const { authstore, check } = usestore();
 
 
-  useEffect(() => {
+ useEffect(() => {
+  const token = localStorage.getItem("token");
+
+  if (token) {
     check();
-  }, [check]);
+  }
+}, [check]);
 
   console.log("the auth is ", authstore);
 
@@ -138,7 +160,7 @@ function AppLayout() {
           element={
             <LandingPage
               navigate={navigate}
-              onLogin={() => navigate("/register")}
+              onLogin={() => navigate("/login")}
             />
           }
         />
@@ -179,46 +201,49 @@ function AppLayout() {
           }
         />
 
-        <Route element={<ProtectedRoute />}>
+       <Route element={<ProtectedRoute />}>
 
-          <Route
-            path="/dashboard"
-            element={
-              <Dashboard
-                navigate={navigate}
-              />
-            }
-          />
+  <Route
+    path="/dashboard"
+    element={
+      <Dashboard
+        navigate={navigate}
+        showToast={showToast}
+      />
+    }
+  />
 
-          <Route
-            path="/explore"
-            element={
-              <ExplorePage
-                navigate={navigate}
-              />
-            }
-          />
+  <Route
+    path="/explore"
+    element={
+      <ExplorePage
+        navigate={navigate}
+        showToast={showToast}
+      />
+    }
+  />
 
-          <Route
-            path="/skills"
-            element={
-              <SkillsPage
-                navigate={navigate}
-              />
-            }
-          />
+  <Route
+    path="/skills"
+    element={
+      <SkillsPage
+        navigate={navigate}
+        showToast={showToast}
+      />
+    }
+  />
 
-          <Route
-            path="/profile"
-            element={
-              <ProfilePage
-                navigate={navigate}
-              />
-            }
-          />
+  <Route
+    path="/profile"
+    element={
+      <ProfilePage
+        navigate={navigate}
+        showToast={showToast}
+      />
+    }
+  />
 
-        </Route>
-
+</Route>
         <Route
           element={
             <ProtectedRoute adminOnly={true} />
@@ -245,7 +270,7 @@ function AppLayout() {
 
       </Routes>
 
-      {userRole && (
+      {userRole && userRole !== "admin" && (
         <>
           {!chatOpen && (
             <button
@@ -303,6 +328,15 @@ function AppLayout() {
             />
           )}
         </>
+      )}
+
+ {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
 
     </div>

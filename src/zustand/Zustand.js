@@ -1,17 +1,34 @@
-import { create } from 'zustand'
-import {} from 'zustand'
-import { api } from '../api/Axios'
+import { create } from "zustand";
+import { api } from "../api/Axios";
 
-const usestore = create((set)=>({
-authstore: null,
+const usestore = create((set) => ({
+  authstore: null,
 
-check:async ()=>{
-    const res = await api.get("/checkauth")
-    console.log("checkauth",res.data)
-    set({authstore:res.data
+  check: async () => {
+    try {
+      const res = await api.get("/checkauth");
 
-    })
-    console.log(authstore);
-}
-}))
-export default  usestore;//zustand store
+      console.log("checkauth:", res.data);
+
+      set({
+        authstore: res.data,
+      });
+
+      return res.data;
+    } catch (error) {
+      if (error.response?.status === 401) {
+        console.log("User is not authenticated");
+
+        set({
+          authstore: null,
+        });
+      } else {
+        console.error("Check authentication failed:", error);
+      }
+
+      return null;
+    }
+  },
+}));
+
+export default usestore;

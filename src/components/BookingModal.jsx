@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { requestSession } from "../api";
 
-export default function BookingModal({ tutor, onClose }) {
+export default function BookingModal({ tutor, onClose, showToast }) {
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -24,12 +24,22 @@ export default function BookingModal({ tutor, onClose }) {
   // TUTOR'S FIXED SCHEDULE
   // =========================================================
   // In the future, this can come from the tutor profile/API.
-  const tutorSchedule = tutor?.schedule || {
-    startTime: "9:00 AM",
-    endTime: "11:00 AM",
-    hoursPerDay: 2,
-    availableDays: ["Monday", "Wednesday", "Friday"],
-  };
+  console.log("BOOKING MODAL TUTOR:", tutor);
+console.log(
+  "BOOKING MODAL SCHEDULE:",
+  tutor?.schedule
+);
+console.log(
+  "BOOKING MODAL AVAILABLE DAYS:",
+  tutor?.schedule?.availableDays
+);
+
+const tutorSchedule = tutor?.schedule || {
+  startTime: "",
+  endTime: "",
+  hoursPerDay: 0,
+  availableDays: [],
+};
 
   // =========================================================
   // CHECK WHETHER SELECTED DATE IS AVAILABLE
@@ -114,17 +124,27 @@ export default function BookingModal({ tutor, onClose }) {
       console.log("Tutor:", tutor);
       console.log("Payload:", payload);
 
-      const res = await requestSession(payload);
+     const res = await requestSession(payload);
 
-      console.log("Booking response:", res);
+console.log("Booking response:", res);
 
-      if (res?.message) {
-        setStep(3);
-      } else {
-        setError(
-          "Booking request failed. Please try again."
-        );
-      }
+if (res?.message) {
+  showToast?.(
+    "Session requested successfully! 🎉",
+    "success"
+  );
+
+  setStep(3);
+} else {
+  setError(
+    "Booking request failed. Please try again."
+  );
+
+  showToast?.(
+    "Booking request failed. Please try again.",
+    "error"
+  );
+} 
     } catch (err) {
       console.error(
         "Booking request error:",

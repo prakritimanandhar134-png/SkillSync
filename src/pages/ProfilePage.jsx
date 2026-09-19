@@ -4,13 +4,14 @@ import { getMe, getUserReviews, getMySessions, getUserById,
          changePassword } from "../api";
 import SkillSelector from "../components/SkillSelector";
 
-export default function ProfilePage({ navigate }) {
+export default function ProfilePage({ navigate, showToast }) {
   const [activeTab,      setActiveTab]      = useState("overview");
   const [user,           setUser]           = useState(null);
   const [reviews,        setReviews]        = useState([]);
   const [sessions,       setSessions]       = useState([]);
   const [loading,        setLoading]        = useState(true);
   const [showSkillModal, setShowSkillModal] = useState(false);
+  const [skillMode, setSkillMode] = useState("teach");
   const [saveMsg,        setSaveMsg]        = useState("");
   const [saveError,      setSaveError]      = useState("");
   const [saving,         setSaving]         = useState(false);
@@ -20,8 +21,16 @@ export default function ProfilePage({ navigate }) {
 
   // Settings form state
   const [form, setForm] = useState({
-    full_name:"", university:"", year:"", bio:"", location:""
-  });
+  full_name: "",
+  university: "",
+  year: "",
+  bio: "",
+  location: "",
+  available_days: [],
+  class_start_time: "",
+  class_end_time: "",
+  hours_per_day: ""
+});
   const [pwForm, setPwForm] = useState({
     current_password:"", new_password:"", confirm_password:""
   });
@@ -31,12 +40,20 @@ export default function ProfilePage({ navigate }) {
       const [userData, sessionData] = await Promise.all([getMe(), getMySessions()]);
       setUser(userData);
       setForm({
-        full_name:   userData.full_name  || "",
-        university:  userData.university || "",
-        year:        userData.year       || "",
-        bio:         userData.bio        || "",
-        location:    userData.location   || "",
-      });
+  full_name: userData.full_name || "",
+  university: userData.university || "",
+  year: userData.year || "",
+  bio: userData.bio || "",
+  location: userData.location || "",
+  available_days: Array.isArray(userData.available_days)
+  ? userData.available_days
+  : userData.available_days
+    ? JSON.parse(userData.available_days)
+    : [],
+  class_start_time: userData.class_start_time || "",
+  class_end_time: userData.class_end_time || "",
+  hours_per_day: userData.hours_per_day || ""
+});
       setSessions(Array.isArray(sessionData) ? sessionData : []);
       if (userData?.id) {
         const fullProfile = await getUserById(userData.id);
@@ -74,7 +91,8 @@ export default function ProfilePage({ navigate }) {
         const stored = JSON.parse(localStorage.getItem("user")||"{}");
         localStorage.setItem("user", JSON.stringify({ ...stored, ...data.user }));
       }
-      setSaveMsg("✅ Profile saved successfully!");
+    
+showToast("Profile updated successfully!", "success");
       setTimeout(() => setSaveMsg(""), 3000);
     } catch (err) {
       setSaveError("Failed to save. Try again.");
@@ -98,7 +116,8 @@ export default function ProfilePage({ navigate }) {
     try {
       const data = await changePassword(pwForm.current_password, pwForm.new_password);
       if (data.message?.includes("successfully")) {
-        setPwMsg("✅ Password changed successfully!");
+       
+showToast("Password changed successfully!", "success");
         setPwForm({ current_password:"", new_password:"", confirm_password:"" });
       } else {
         setPwError(data.message || "Failed to change password.");
@@ -112,16 +131,21 @@ export default function ProfilePage({ navigate }) {
   const handleAvatarChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 2*1024*1024) { alert("Image must be under 2MB"); return; }
+    if (file.size > 10 * 1024 * 1024) {
+  showToast("Image must be under 10MB.", "error");
+  return;
+}
     const reader = new FileReader();
     reader.onload = async () => {
       const base64 = reader.result;
       try {
         const data = await uploadAvatar(base64);
         if (data.avatar_url) {
+        
           setUser(prev => ({ ...prev, avatar_url: data.avatar_url }));
           const stored = JSON.parse(localStorage.getItem("user")||"{}");
           localStorage.setItem("user", JSON.stringify({ ...stored, avatar_url: data.avatar_url }));
+        showToast("Profile picture updated successfully!", "success");
         }
       } catch (err) {
         console.error("Avatar upload error:", err);
@@ -131,14 +155,24 @@ export default function ProfilePage({ navigate }) {
   };
 
   // ── Remove skill ──────────────────────────────
-  const handleRemoveTeach = async (id) => {
-  await removeMySkill(id);
-  fetchData();
+ const handleRemoveTeach = async (id) => {
+  try {
+    await removeMySkill(id);
+    showToast("Teaching skill removed successfully!", "success");
+    fetchData();
+  } catch (err) {
+    showToast("Failed to remove skill.", "error");
+  }
 };
 
 const handleRemoveLearn = async (id) => {
-  await removeMySkill(id);
-  fetchData();
+  try {
+    await removeMySkill(id);
+    showToast("Learning skill removed successfully!", "success");
+    fetchData();
+  } catch (err) {
+    showToast("Failed to remove skill.", "error");
+  }
 };
 
   if (loading) {
@@ -174,7 +208,7 @@ const handleRemoveLearn = async (id) => {
               <button onClick={() => fileRef.current.click()} style={{ position:"absolute", bottom:0, right:0, width:28, height:28, borderRadius:"50%", background:"#6C63FF", border:"2px solid white", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", fontSize:13 }}>
                 📷
               </button>
-              <input ref={fileRef} type="file" accept="image/*" onChange={handleAvatarChange} style={{ display:"none" }}/>
+              <input ref={fileRef} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" onChange={handleAvatarChange} style={{ display:"none" }}/>
             </div>
 
             {/* Actions */}
@@ -243,7 +277,7 @@ const handleRemoveLearn = async (id) => {
             <div style={{ background:"white", borderRadius:16, padding:24, border:"1px solid #F3F4F6" }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
                 <h3 style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:16, fontWeight:700, color:"#111827" }}>⚡ Skills I Teach</h3>
-                <button onClick={() => setShowSkillModal(true)} style={{ fontSize:12, color:"#6C63FF", fontWeight:600, background:"#F5F3FF", border:"1px solid #E9D5FF", borderRadius:99, padding:"4px 12px", cursor:"pointer" }}>
+                <button onClick={() => {setSkillMode("teach"); setShowSkillModal(true);}} style={{ fontSize:12, color:"#6C63FF", fontWeight:600, background:"#F5F3FF", border:"1px solid #E9D5FF", borderRadius:99, padding:"4px 12px", cursor:"pointer" }}>
                   + Add
                 </button>
               </div>
@@ -259,7 +293,10 @@ const handleRemoveLearn = async (id) => {
               ) : (
                 <div style={{ textAlign:"center", padding:"20px 0" }}>
                   <p style={{ fontSize:13, color:"#9CA3AF", marginBottom:10 }}>No skills added yet</p>
-                  <button onClick={() => setShowSkillModal(true)} style={{ padding:"8px 20px", background:"#6C63FF", color:"white", border:"none", borderRadius:99, fontSize:13, fontWeight:600, cursor:"pointer" }}>
+                  <button onClick={() => {
+                    setSkillMode("teach");
+                    setShowSkillModal(true);
+                  }} style={{ padding:"8px 20px", background:"#6C63FF", color:"white", border:"none", borderRadius:99, fontSize:13, fontWeight:600, cursor:"pointer" }}>
                     + Add your first skill
                   </button>
                 </div>
@@ -270,8 +307,11 @@ const handleRemoveLearn = async (id) => {
             <div style={{ background:"white", borderRadius:16, padding:24, border:"1px solid #F3F4F6" }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
                 <h3 style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:16, fontWeight:700, color:"#111827" }}>📚 Skills I Want to Learn</h3>
-                <button onClick={() => setShowSkillModal(true)} style={{ fontSize:12, color:"#6C63FF", fontWeight:600, background:"#F5F3FF", border:"1px solid #E9D5FF", borderRadius:99, padding:"4px 12px", cursor:"pointer" }}>
-                  + Add
+                <button onClick={() => {
+                  setSkillMode("learn");
+                  setShowSkillModal(true);
+                }} style={{ fontSize:12, color:"#6C63FF", fontWeight:600, background:"#F5F3FF", border:"1px solid #E9D5FF", borderRadius:99, padding:"4px 12px", cursor:"pointer" }}>
+                  + Add 
                 </button>
               </div>
               {user?.wants && user.wants.length > 0 ? (
@@ -286,7 +326,10 @@ const handleRemoveLearn = async (id) => {
               ) : (
                 <div style={{ textAlign:"center", padding:"20px 0" }}>
                   <p style={{ fontSize:13, color:"#9CA3AF", marginBottom:10 }}>No learning goals yet</p>
-                  <button onClick={() => setShowSkillModal(true)} style={{ padding:"8px 20px", background:"#6C63FF", color:"white", border:"none", borderRadius:99, fontSize:13, fontWeight:600, cursor:"pointer" }}>
+                  <button onClick={() => {
+                    setSkillMode("learn");
+                    setShowSkillModal(true);
+                  }} style={{ padding:"8px 20px", background:"#6C63FF", color:"white", border:"none", borderRadius:99, fontSize:13, fontWeight:600, cursor:"pointer" }}>
                     + Add what you want to learn
                   </button>
                 </div>
@@ -324,7 +367,7 @@ const handleRemoveLearn = async (id) => {
               <div style={{ textAlign:"center", padding:"60px 20px" }}>
                 <p style={{ fontSize:32, marginBottom:8 }}>📅</p>
                 <p style={{ fontSize:15, fontWeight:600, color:"#374151", marginBottom:4 }}>No sessions yet</p>
-                <button onClick={() => navigate("explore")} style={{ padding:"10px 24px", background:"#6C63FF", color:"white", border:"none", borderRadius:99, fontSize:14, fontWeight:600, cursor:"pointer" }}>
+                <button onClick={() => navigate("/explore")} style={{ padding:"10px 24px", background:"#6C63FF", color:"white", border:"none", borderRadius:99, fontSize:14, fontWeight:600, cursor:"pointer" }}>
                   Find a Tutor
                 </button>
               </div>
@@ -408,7 +451,7 @@ const handleRemoveLearn = async (id) => {
                   <button onClick={() => fileRef.current.click()} style={{ padding:"7px 16px", background:"#6C63FF", color:"white", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>
                     📷 Upload Photo
                   </button>
-                  <p style={{ fontSize:11, color:"#9CA3AF", marginTop:4 }}>JPG, PNG under 2MB</p>
+                  <p style={{ fontSize:11, color:"#9CA3AF", marginTop:4 }}>JPG, PNG under 10MB</p>
                 </div>
               </div>
 
@@ -443,6 +486,225 @@ const handleRemoveLearn = async (id) => {
                   onBlur={e => e.target.style.borderColor="#E5E7EB"}
                 />
               </div>
+             {/* Available Days */}
+<div style={{ marginTop: 20 }}>
+  <label
+    style={{
+      display: "block",
+      fontSize: 13,
+      fontWeight: 700,
+      color: "#374151",
+      marginBottom: 8
+    }}
+  >
+    Available Days for Teaching
+  </label>
+
+  <p
+    style={{
+      fontSize: 12,
+      color: "#9CA3AF",
+      marginBottom: 10
+    }}
+  >
+    Select the days when students can request a session with you.
+  </p>
+
+  <div
+    style={{
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 8
+    }}
+  >
+    {[
+      "Sunday",
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday"
+    ].map(day => {
+      const selected = form.available_days.includes(day);
+
+      return (
+        <button
+          key={day}
+          type="button"
+          onClick={() => {
+            setForm(prev => ({
+              ...prev,
+              available_days: selected
+                ? prev.available_days.filter(d => d !== day)
+                : [...prev.available_days, day]
+            }));
+          }}
+          style={{
+            padding: "8px 14px",
+            borderRadius: 999,
+            border: "1.5px solid",
+            borderColor: selected ? "#6C63FF" : "#E5E7EB",
+            background: selected ? "#6C63FF" : "white",
+            color: selected ? "white" : "#6B7280",
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: "pointer"
+          }}
+        >
+          {selected ? "✓ " : ""}
+          {day}
+        </button>
+      );
+    })}
+  </div>
+</div>
+
+{/* Class Schedule */}
+<div style={{ marginTop: 20 }}>
+
+  <label
+    style={{
+      display: "block",
+      fontSize: 13,
+      fontWeight: 700,
+      color: "#374151",
+      marginBottom: 8
+    }}
+  >
+    Class Schedule
+  </label>
+
+  <p
+    style={{
+      fontSize: 12,
+      color: "#9CA3AF",
+      marginBottom: 12
+    }}
+  >
+    Set the time when you are available to teach.
+  </p>
+
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 12
+    }}
+  >
+
+    {/* Start Time */}
+    <div>
+      <label
+        style={{
+          display: "block",
+          fontSize: 12,
+          fontWeight: 600,
+          color: "#6B7280",
+          marginBottom: 6
+        }}
+      >
+        Start Time
+      </label>
+
+     <input
+  type="time"
+  value={form.class_start_time}
+  onChange={e =>
+    setForm(prev => ({
+      ...prev,
+      class_start_time: e.target.value
+    }))
+  }
+        style={{
+          width: "100%",
+          padding: "10px 14px",
+          border: "1.5px solid #E5E7EB",
+          borderRadius: 10,
+          fontSize: 14,
+          boxSizing: "border-box"
+        }}
+      />
+    </div>
+
+    {/* End Time */}
+    <div>
+      <label
+        style={{
+          display: "block",
+          fontSize: 12,
+          fontWeight: 600,
+          color: "#6B7280",
+          marginBottom: 6
+        }}
+      >
+        End Time
+      </label>
+
+     <input
+  type="time"
+  value={form.class_end_time}
+  onChange={e =>
+    setForm(prev => ({
+      ...prev,
+      class_end_time: e.target.value
+    }))
+  }
+
+        style={{
+          width: "100%",
+          padding: "10px 14px",
+          border: "1.5px solid #E5E7EB",
+          borderRadius: 10,
+          fontSize: 14,
+          boxSizing: "border-box"
+        }}
+      />
+    </div>
+
+  </div>
+
+  {/* Hours per day */}
+  <div style={{ marginTop: 12 }}>
+
+    <label
+      style={{
+        display: "block",
+        fontSize: 12,
+        fontWeight: 600,
+        color: "#6B7280",
+        marginBottom: 6
+      }}
+    >
+      Hours Per Day
+    </label>
+
+    <input
+      type="number"
+      min="1"
+      max="12"
+      step="0.5"
+      value={form.hours_per_day}
+      onChange={e =>
+        setForm(prev => ({
+          ...prev,
+          hours_per_day: e.target.value
+        }))
+      }
+      placeholder="e.g. 2"
+      style={{
+        width: "100%",
+        padding: "10px 14px",
+        border: "1.5px solid #E5E7EB",
+        borderRadius: 10,
+        fontSize: 14,
+        boxSizing: "border-box"
+      }}
+    />
+
+  </div>
+
+</div>
 
               {saveMsg   && <p style={{ fontSize:13, color:"#059669", fontWeight:600, marginBottom:12 }}>{saveMsg}</p>}
               {saveError && <p style={{ fontSize:13, color:"#DC2626", marginBottom:12 }}>⚠️ {saveError}</p>}
@@ -513,10 +775,15 @@ const handleRemoveLearn = async (id) => {
       </div>
 
       {showSkillModal && (
-        <SkillSelector
-          onClose={() => setShowSkillModal(false)}
-          onSkillAdded={() => { fetchData(); setShowSkillModal(false); }}
-        />
+     <SkillSelector
+  mode={skillMode}
+  onClose={() => setShowSkillModal(false)}
+  onSkillAdded={() => {
+    fetchData();
+    setShowSkillModal(false);
+    showToast("Skill added successfully!", "success");
+  }}
+/>
       )}
     </div>
   );

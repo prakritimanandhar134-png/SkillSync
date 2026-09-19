@@ -1,18 +1,26 @@
 import { useState, useEffect } from "react";
 import { getAllSkills } from "../api";
 
-export default function SkillsPage({ navigate }) {
+export default function SkillsPage({ navigate, showToast }) {
   const [skills,   setSkills]   = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [search,   setSearch]   = useState("");
   const [category, setCategory] = useState("All");
 
   useEffect(() => {
-    getAllSkills().then(data => {
-      if (Array.isArray(data)) setSkills(data);
+  getAllSkills()
+    .then(data => {
+      if (Array.isArray(data)) {
+        setSkills(data);
+      }
       setLoading(false);
+    })
+    .catch(err => {
+      console.error("Get skills error:", err);
+      setLoading(false);
+      showToast("Failed to load skills.", "error");
     });
-  }, []);
+}, [showToast]);
 
   const filtered = skills.filter(s => {
     const matchCat    = category === "All" || s.category === category;
@@ -87,7 +95,7 @@ export default function SkillsPage({ navigate }) {
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12 }}>
               {programming.map(skill => (
-                <button key={skill.id} onClick={() => navigate("explore")} style={{
+                <button key={skill.id} onClick={() => navigate("/explore")} style={{
                   background:"white", border:"1px solid #F3F4F6",
                   borderRadius:12, padding:"16px",
                   textAlign:"left", cursor:"pointer",
@@ -118,7 +126,7 @@ export default function SkillsPage({ navigate }) {
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12 }}>
               {design.map(skill => (
-                <button key={skill.id} onClick={() => navigate("explore")} style={{
+                <button key={skill.id} onClick={() => navigate("/explore")} style={{
                   background:"white", border:"1px solid #F3F4F6",
                   borderRadius:12, padding:"16px",
                   textAlign:"left", cursor:"pointer",
@@ -155,7 +163,7 @@ export default function SkillsPage({ navigate }) {
               You can add any custom skill from your Profile page
             </p>
           </div>
-          <button onClick={() => navigate("profile")} style={{ padding:"12px 28px", background:"white", color:"#6C63FF", border:"none", borderRadius:99, fontSize:14, fontWeight:700, cursor:"pointer" }}>
+          <button onClick={() => navigate("/profile")} style={{ padding:"12px 28px", background:"white", color:"#6C63FF", border:"none", borderRadius:99, fontSize:14, fontWeight:700, cursor:"pointer" }}>
             Add Custom Skill →
           </button>
         </div>

@@ -3,7 +3,10 @@ import {
   getRecommendations,
   getMySessions,
   getMySkills,
-  getPendingSessions
+  getPendingSessions,
+  completeSession,
+  submitReview,
+  getSessionReview,
 } from "../api";
 import BookingModal from "../components/BookingModal";
 
@@ -60,18 +63,23 @@ function getGrad(id) {
 }
 
 
-export default function Dashboard({ navigate }) {
-
+export default function Dashboard({ navigate, showToast }) {
   const [tutors, setTutors] = useState([]);
   const [sessions, setSessions] = useState([]);
  const [pendingRequests, setPendingRequests] = useState([]);
   const [mySkills, setMySkills] = useState([]);
  
 
-  const [loading, setLoading] = useState(true);
-  const [bookingTutor, setBookingTutor] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
-  
+ const [loading, setLoading] = useState(true);
+const [bookingTutor, setBookingTutor] = useState(null);
+const [currentUser, setCurrentUser] = useState(null);
+
+// Rating states
+const [reviewSession, setReviewSession] = useState(null);
+const [reviewRating, setReviewRating] = useState(0);
+const [reviewComment, setReviewComment] = useState("");
+const [reviewSubmitting, setReviewSubmitting] = useState(false);
+const [reviewedSessions, setReviewedSessions] = useState({});
   const refreshSessions = async () => {
   try {
     const [updatedSessions, updatedPending] = await Promise.all([
@@ -129,8 +137,7 @@ const handleAcceptSession = async (sessionId) => {
       );
     }
 
-    alert("Session accepted successfully! 🎉");
-
+    showToast("Session accepted successfully! 🎉", "success");
     // Refresh sessions + pending requests
     await refreshSessions();
 
@@ -141,10 +148,11 @@ const handleAcceptSession = async (sessionId) => {
       error
     );
 
-    alert(
-      error.message ||
-      "Failed to accept session."
-    );
+    showToast(
+  error.message ||
+  "Failed to accept session.",
+  "error"
+);
   }
 };
 
@@ -194,8 +202,7 @@ const handleRejectSession = async (sessionId) => {
       );
     }
 
-    alert("Session rejected.");
-
+    showToast("Session rejected.", "success");
     // Refresh sessions + pending requests
     await refreshSessions();
 
@@ -206,13 +213,180 @@ const handleRejectSession = async (sessionId) => {
       error
     );
 
-    alert(
+    showToast(
       error.message ||
-      "Failed to reject session."
+      "Failed to reject session.",
+      "error"
     );
   }
 };
 
+// ============================================
+// CANCEL SESSION
+// ============================================
+
+const handleCancelSession = async (sessionId) => {
+  const confirmed = window.confirm(
+    "Are you sure you want to cancel this session?"
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    const token = localStorage.getItem("token");
+
+    const response = await fetch(
+      `http://localhost:5001/api/sessions/${sessionId}/cancel`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        }
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message ||
+        "Failed to cancel session."
+      );
+    }
+
+    showToast("Session cancelled successfully.", "success");
+
+    await refreshSessions();
+
+  } catch (error) {
+    console.error(
+      "Cancel session error:",
+      error
+    );
+
+     showToast(
+    error.message ||
+    "Failed to cancel session.",
+    "error"
+  );
+  }
+};
+
+const handleCompleteSession = async (sessionId) => {
+  try {
+    await completeSession(sessionId);
+
+  setSessions((prevSessions) =>
+      prevSessions.map((session) =>
+        session.id === sessionId
+          ? { ...session, status: "completed" }
+          : session
+      )
+    );
+    
+    showToast("Session marked as completed.", "success");
+
+    // Use your existing function that refreshes Dashboard data
+    await loadDashboardData();
+  } catch (error) {
+    console.error("Complete session error:", error);
+
+    showToast(
+      error.message || "Failed to mark session as completed.",
+      "error"
+    );
+  }
+};
+
+// ============================================
+// OPEN REVIEW MODAL
+// ============================================
+
+const handleOpenReview = async (session) => {
+  try {
+    const existingReview = await getSessionReview(session.id);
+
+    // If a review already exists, do not allow another review
+    if (existingReview) {
+      showToast("You have already reviewed this session.", "info");
+      return;
+    }
+
+    setReviewSession(session);
+    setReviewRating(0);
+    setReviewComment("");
+
+  } catch (error) {
+    console.error("Check review error:", error);
+
+    // If the backend returns 404, it normally means
+    // no review exists yet, so open the modal.
+    if (
+      error.message?.toLowerCase().includes("not found") ||
+      error.message?.includes("404")
+    ) {
+      setReviewSession(session);
+      setReviewRating(0);
+      setReviewComment("");
+    } else {
+      showToast(
+        error.message || "Unable to check review status.",
+        "error"
+      );
+    }
+  }
+};
+
+
+// ============================================
+// SUBMIT REVIEW
+// ============================================
+
+const handleSubmitReview = async () => {
+  if (!reviewSession) return;
+
+  if (!reviewRating) {
+    showToast("Please select a rating first.", "error");
+    return;
+  }
+
+  try {
+    setReviewSubmitting(true);
+
+    await submitReview({
+      session_id: reviewSession.id,
+      rating: reviewRating,
+      comment: reviewComment.trim()
+    });
+
+    setReviewedSessions(previous => ({
+      ...previous,
+      [reviewSession.id]: true
+    }));
+
+    showToast("Thank you for your review! ⭐", "success");
+
+    setReviewSession(null);
+    setReviewRating(0);
+    setReviewComment("");
+
+    await refreshSessions();
+
+  } catch (error) {
+    console.error("Submit review error:", error);
+
+    showToast(
+      error.message || "Failed to submit review.",
+      "error"
+    );
+
+  } finally {
+    setReviewSubmitting(false);
+  }
+};
 
   // ============================================
   // LOAD DASHBOARD DATA
@@ -329,7 +503,14 @@ setPendingRequests(
       s.status === "upcoming" 
   );
   
+const myPendingRequests = sessions.filter(
+  s =>
+    s.status === "requested" &&
+    s.student_id === currentUser?.id
+);
 
+const incomingPendingRequests =
+  pendingRequests;
   // ============================================
   // BARTER MATCHES
   // ============================================
@@ -735,10 +916,10 @@ setPendingRequests(
               delta: "Scheduled sessions",
               color: "#ECFDF5"
             },
-            {
+           {
   label: "Pending Requests",
   value:
-    pendingRequests.length,
+    myPendingRequests.length,
   icon: "⏳",
   delta: "Waiting for response",
   color: "#FFFBEB"
@@ -1491,66 +1672,200 @@ setPendingRequests(
 
                       </div>
 
+{s.status === "upcoming" ? (
 
-                      {s.status ===
-                      "upcoming" ? (
+  <div
+    style={{
+      display: "flex",
+      flexDirection: "column",
+      gap: 5,
+      alignItems: "flex-end"
+    }}
+  >
 
-                        <a
-                          href={s.meet_link}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{
-                            padding:
-                              "4px 10px",
-                            background:
-                              "#6C63FF",
-                            color: "white",
-                            border: "none",
-                            borderRadius: 99,
-                            fontSize: 11,
-                            fontWeight: 600,
-                            cursor:
-                              "pointer",
-                            textDecoration:
-                              "none"
-                          }}
-                        >
-                          🎥 Join
-                        </a>
+    <a
+      href={s.meet_link}
+      target="_blank"
+      rel="noreferrer"
+      style={{
+        padding: "4px 10px",
+        background: "#6C63FF",
+        color: "white",
+        borderRadius: 99,
+        fontSize: 11,
+        fontWeight: 600,
+        textDecoration: "none"
+      }}
+    >
+      🎥 Join
+    </a>
 
-                      ) : s.status ===
-                        "requested" ? (
+{s.tutor_id === currentUser?.id &&
+  s.status?.toLowerCase() === "upcoming" && (
+  <button
+    onClick={() => handleCompleteSession(s.id)}
+    style={{
+      padding: "4px 10px",
+      background: "#ECFDF5",
+      color: "#059669",
+      border: "1px solid #A7F3D0",
+      borderRadius: 99,
+      fontSize: 10,
+      fontWeight: 600,
+      cursor: "pointer"
+    }}
+  >
+    Mark as Completed
+  </button>
+)}
 
-                        <span
-                          style={{
-                            fontSize: 11,
-                            color: "#F59E0B",
-                            fontWeight: 600,
-                            background:
-                              "#FFFBEB",
-                            padding:
-                              "3px 8px",
-                            borderRadius: 99,
-                            border:
-                              "1px solid #FDE68A"
-                          }}
-                        >
-                          ⏳ Pending
-                        </span>
+    <button
+      onClick={() =>
+        handleCancelSession(s.id)
+      }
+      style={{
+        padding: "4px 10px",
+        background: "#FEF2F2",
+        color: "#DC2626",
+        border: "1px solid #FECACA",
+        borderRadius: 99,
+        fontSize: 10,
+        fontWeight: 600,
+        cursor: "pointer"
+      }}
+    >
+      Cancel
+    </button>
 
-                      ) : (
+  </div>
 
-                        <span
-                          style={{
-                            fontSize: 11,
-                            color: "#9CA3AF",
-                            fontWeight: 500
-                          }}
-                        >
-                          Done
-                        </span>
+) : s.status === "requested" ? (
 
-                      )}
+  <div
+    style={{
+      display: "flex",
+      flexDirection: "column",
+      gap: 5,
+      alignItems: "flex-end"
+    }}
+  >
+
+    <span
+      style={{
+        fontSize: 11,
+        color: "#F59E0B",
+        fontWeight: 600,
+        background: "#FFFBEB",
+        padding: "3px 8px",
+        borderRadius: 99,
+        border: "1px solid #FDE68A"
+      }}
+    >
+      ⏳ Pending
+    </span>
+
+    <button
+      onClick={() =>
+        handleCancelSession(s.id)
+      }
+      style={{
+        padding: "4px 10px",
+        background: "#FEF2F2",
+        color: "#DC2626",
+        border: "1px solid #FECACA",
+        borderRadius: 99,
+        fontSize: 10,
+        fontWeight: 600,
+        cursor: "pointer"
+      }}
+    >
+      Cancel
+    </button>
+
+   
+
+  </div>
+
+) : s.status === "completed" ? (
+
+  <div
+    style={{
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "flex-end",
+      gap: 5
+    }}
+  >
+
+    <span
+      style={{
+        fontSize: 11,
+        color: "#059669",
+        fontWeight: 600
+      }}
+    >
+      ✓ Completed
+    </span>
+
+    {s.tutor_id === currentUser?.id ? (
+
+      <span
+        style={{
+          fontSize: 10,
+          color: "#9CA3AF",
+          textAlign: "right"
+        }}
+      >
+        Student review
+      </span>
+
+    ) : reviewedSessions[s.id] ? (
+
+      <span
+        style={{
+          fontSize: 10,
+          color: "#059669",
+          fontWeight: 600
+        }}
+      >
+        ⭐ Reviewed
+      </span>
+
+    ) : (
+
+      <button
+        onClick={() => handleOpenReview(s)}
+        style={{
+          padding: "5px 10px",
+          background: "#FEF3C7",
+          color: "#B45309",
+          border: "1px solid #FDE68A",
+          borderRadius: 99,
+          fontSize: 10,
+          fontWeight: 700,
+          cursor: "pointer"
+        }}
+      >
+        ⭐ Rate Session
+      </button>
+
+    )}
+
+  </div>
+
+) : (
+
+  <span
+    style={{
+      fontSize: 11,
+      color: "#9CA3AF",
+      fontWeight: 500
+    }}
+  >
+    Done
+  </span>
+
+)}
 
                     </div>
 
@@ -1973,20 +2288,240 @@ setPendingRequests(
       {bookingTutor && (
 
         <BookingModal
-          tutor={{
-            ...bookingTutor,
-            name: bookingTutor.full_name,
-            barter: bookingTutor.barter_ready,
-            rate:
-              bookingTutor.hourly_rate || 0
-          }}
-          onClose={() =>
-            setBookingTutor(null)
-          }
-        />
+  tutor={{
+    ...bookingTutor,
+    name: bookingTutor.full_name,
+    barter: bookingTutor.barter_ready,
+    rate: bookingTutor.hourly_rate || 0
+  }}
+  onClose={() => setBookingTutor(null)}
+  showToast={showToast}
+/>
 
       )}
+{/* REVIEW MODAL */}
 
+{reviewSession && (
+
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.45)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 20,
+      zIndex: 9999
+    }}
+  >
+
+    <div
+      style={{
+        width: "100%",
+        maxWidth: 420,
+        background: "white",
+        borderRadius: 18,
+        padding: 24,
+        boxShadow: "0 20px 60px rgba(0,0,0,0.2)"
+      }}
+    >
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 18
+        }}
+      >
+
+        <div>
+          <h2
+            style={{
+              fontFamily: "'Space Grotesk',sans-serif",
+              fontSize: 20,
+              fontWeight: 800,
+              color: "#111827",
+              marginBottom: 4
+            }}
+          >
+            Rate Your Session ⭐
+          </h2>
+
+          <p
+            style={{
+              fontSize: 12,
+              color: "#6B7280"
+            }}
+          >
+            How was your session with{" "}
+            <strong>
+              {reviewSession.tutor_name}
+            </strong>?
+          </p>
+        </div>
+
+        <button
+          onClick={() => setReviewSession(null)}
+          style={{
+            width: 30,
+            height: 30,
+            borderRadius: "50%",
+            border: "none",
+            background: "#F3F4F6",
+            color: "#6B7280",
+            fontSize: 18,
+            cursor: "pointer"
+          }}
+        >
+          ×
+        </button>
+
+      </div>
+
+
+      {/* STAR RATING */}
+
+      <p
+        style={{
+          fontSize: 13,
+          fontWeight: 700,
+          color: "#374151",
+          marginBottom: 10
+        }}
+      >
+        Your rating
+      </p>
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: 8,
+          marginBottom: 20
+        }}
+      >
+
+        {[1, 2, 3, 4, 5].map(star => (
+
+          <button
+            key={star}
+            onClick={() => setReviewRating(star)}
+            style={{
+              border: "none",
+              background: "none",
+              fontSize: 34,
+              cursor: "pointer",
+              color:
+                star <= reviewRating
+                  ? "#F59E0B"
+                  : "#D1D5DB",
+              transition: "transform 0.15s"
+            }}
+          >
+            ★
+          </button>
+
+        ))}
+
+      </div>
+
+
+      {/* COMMENT */}
+
+      <label
+        style={{
+          display: "block",
+          fontSize: 13,
+          fontWeight: 700,
+          color: "#374151",
+          marginBottom: 8
+        }}
+      >
+        Comment (optional)
+      </label>
+
+      <textarea
+        value={reviewComment}
+        onChange={e => setReviewComment(e.target.value)}
+        placeholder="Share your experience..."
+        rows={4}
+        style={{
+          width: "100%",
+          padding: 12,
+          borderRadius: 10,
+          border: "1px solid #E5E7EB",
+          resize: "vertical",
+          fontFamily: "inherit",
+          fontSize: 13,
+          outline: "none",
+          marginBottom: 18,
+          boxSizing: "border-box"
+        }}
+      />
+
+
+      {/* ACTIONS */}
+
+      <div
+        style={{
+          display: "flex",
+          gap: 10
+        }}
+      >
+
+        <button
+          onClick={() => setReviewSession(null)}
+          disabled={reviewSubmitting}
+          style={{
+            flex: 1,
+            padding: 11,
+            background: "#F3F4F6",
+            color: "#374151",
+            border: "none",
+            borderRadius: 10,
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: "pointer"
+          }}
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={handleSubmitReview}
+          disabled={reviewSubmitting || !reviewRating}
+          style={{
+            flex: 1,
+            padding: 11,
+            background:
+              reviewSubmitting || !reviewRating
+                ? "#D1D5DB"
+                : "#6C63FF",
+            color: "white",
+            border: "none",
+            borderRadius: 10,
+            fontSize: 13,
+            fontWeight: 700,
+            cursor:
+              reviewSubmitting || !reviewRating
+                ? "not-allowed"
+                : "pointer"
+          }}
+        >
+          {reviewSubmitting
+            ? "Submitting..."
+            : "Submit Review"}
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+
+)}
     </div>
 
   );

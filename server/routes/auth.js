@@ -4,7 +4,7 @@ const bcrypt  = require("bcryptjs");
 const jwt     = require("jsonwebtoken");
 const { pool: db } = require("../config/db");
 const { verifyToken } = require("../middleware/auth");
-
+const createNotification = require("../utils/createNotification");
 // ── REGISTER ──────────────────────────────────
 router.post("/register", async (req, res) => {
   const { full_name, email, password, university, year } = req.body;
@@ -23,6 +23,20 @@ router.post("/register", async (req, res) => {
       "INSERT INTO users (full_name,email,password,university,year) VALUES (?,?,?,?,?)",
       [full_name, email, hashed, university||null, year||null]
     );
+
+    const [admins] = await db.query(
+  "SELECT id FROM users WHERE role = 'admin'"
+);
+
+for (const admin of admins) {
+  await createNotification({
+    userId: admin.id,
+    type: "new_user",
+    title: "New user registered",
+    message: `${full_name} has joined SkillSync.`,
+    referenceId: result.insertId,
+  });
+}
     const token = jwt.sign(
       { id:result.insertId, email, role:"user" },
       process.env.JWT_SECRET, { expiresIn:"7d" }
@@ -74,13 +88,35 @@ router.post("/login", async (req, res) => {
 router.get("/me", verifyToken, async (req, res) => {
   try {
     const [users] = await db.query(
-      "SELECT id,full_name,email,role,university,year,bio,location,avatar_url,skill_score,created_at FROM users WHERE id=?",
+      "SELECT id,full_name,email,role,university,year,bio,location,available_days,avatar_url,skill_score,created_at FROM users WHERE id=?",
       [req.user.id]
     );
-    if (users.length === 0) return res.status(404).json({ message:"User not found." });
-    res.json(users[0]);
+
+    if (users.length === 0) {
+      return res.status(404).json({
+        message:"User not found."
+      });
+    }
+
+    const user = users[0];
+
+    if (user.available_days) {
+      try {
+        user.available_days = JSON.parse(user.available_days);
+      } catch {
+        user.available_days = [];
+      }
+    } else {
+      user.available_days = [];
+    }
+
+    res.json(user);
+
   } catch (err) {
-    res.status(500).json({ message:"Server error." });
+    console.error("Get me error:", err);
+    res.status(500).json({
+      message:"Server error."
+    });
   }
 });
 

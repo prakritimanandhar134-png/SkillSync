@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { useParams } from "react-router-dom";
 import { resetPassword } from "../api";
 
-export default function ResetPasswordPage({ navigate, resetToken }) {
+export default function ResetPasswordPage({ navigate }) {
+  const { token } = useParams();
   const [form,    setForm]    = useState({ new_password:"", confirm_password:"" });
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -19,7 +21,7 @@ export default function ResetPasswordPage({ navigate, resetToken }) {
     }
     setLoading(true); setError("");
     try {
-      const data = await resetPassword(resetToken, form.new_password);
+      const data = await resetPassword(token, form.new_password);
       if (data.message?.includes("successfully")) {
         setSuccess(true);
       } else {

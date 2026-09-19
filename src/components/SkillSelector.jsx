@@ -9,12 +9,15 @@ const categories = [
 "Design"
 ];
 
-export default function SkillSelector({ onClose, onSkillAdded }) {
+export default function SkillSelector({
+  mode = "teach",
+  onClose,
+  onSkillAdded
+}) {
   const [skills,      setSkills]      = useState([]);
   const [filtered,    setFiltered]    = useState([]);
   const [search,      setSearch]      = useState("");
   const [category,    setCategory]    = useState("All");
-  const [mode,        setMode]        = useState("teach");
   const [proficiency, setProficiency] = useState("Intermediate");
   const [hourlyRate,  setHourlyRate]  = useState(0);
   const [selected,    setSelected]    = useState(null);
@@ -55,10 +58,11 @@ export default function SkillSelector({ onClose, onSkillAdded }) {
       const skillId = data.skill_id;
 
       // Then assign to user
-     await addMySkill({
+   await addMySkill({
   skill_id: skillId,
   type: mode,
-  level: proficiency
+  level: proficiency,
+  hourly_rate: mode === "teach" ? Number(hourlyRate) : 0
 });
       setSuccess(`✅ "${customSkillName}" added to your ${mode==="teach"?"teaching":"learning"} list!`);
       setCustomSkillName("");
@@ -78,7 +82,8 @@ export default function SkillSelector({ onClose, onSkillAdded }) {
      await addMySkill({
   skill_id: selected.id,
   type: mode,
-  level: proficiency
+  level: proficiency,
+  hourly_rate:mode === "teach" ? Number(hourlyRate) : 0
 });
       setSuccess(`✅ "${selected.name}" added!`);
       setSelected(null);
@@ -152,7 +157,7 @@ export default function SkillSelector({ onClose, onSkillAdded }) {
             <div style={{ marginBottom:16 }}>
               <label style={{ fontSize:13, fontWeight:600, color:"#374151", display:"block", marginBottom:6 }}>Category</label>
               <select value={customCategory} onChange={e => setCustomCategory(e.target.value)} style={{ width:"100%", padding:"10px 14px", border:"1.5px solid #E5E7EB", borderRadius:10, fontSize:14, outline:"none", background:"white" }}>
-                {["All","Programming","Design"].map(c => <option key={c}>{c}</option>)}
+                {["Programming","Design"].map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
             {mode==="teach" && (

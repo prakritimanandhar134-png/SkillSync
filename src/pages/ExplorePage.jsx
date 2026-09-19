@@ -111,7 +111,7 @@ function TutorCard({ tutor, onBook }) {
   );
 }
 
-export default function ExplorePage({ navigate }) {
+export default function ExplorePage({ navigate, showToast }) {
   const [tutors,       setTutors]       = useState([]);
   const [loading,      setLoading]      = useState(true);
   const [search,       setSearch]       = useState("");
@@ -121,28 +121,85 @@ export default function ExplorePage({ navigate }) {
   const [bookingTutor, setBookingTutor] = useState(null);
   const [error,        setError]        = useState("");
 
-  useEffect(() => {
-    const fetchTutors = async () => {
-      try {
-        const recData = await getRecommendations();
-        if (Array.isArray(recData) && recData.length>0) {
-          setTutors(recData);
-        } else {
-          const allData = await getAllUsers();
-          if (Array.isArray(allData)) {
-            setTutors(allData.filter(u=>u.role!=="admin").map(u=>({
-              ...u, teaches:[], wants:[], match_score:0, recommend_score:0, barter_ready:false
-            })));
-          }
-        }
-      } catch (err) {
-        setError("Could not load tutors. Make sure server is running.");
-      } finally {
-        setLoading(false);
+useEffect(() => {
+  const fetchTutors = async () => {
+    try {
+      // Get ALL users
+      const allData = await getAllUsers();
+      console.log("ALL USERS FROM API:", allData);
+console.log("FIRST USER SCHEDULE DATA:", allData[0]?.class_start_time);
+console.log("FIRST USER END TIME:", allData[0]?.class_end_time);
+
+      // Get skill-based recommendations
+      const recData = await getRecommendations();
+
+      if (!Array.isArray(allData)) {
+        setTutors([]);
+        return;
       }
-    };
-    fetchTutors();
-  }, []);
+
+      // Create a map of recommendation data
+      const recommendationMap = new Map(
+        (Array.isArray(recData) ? recData : []).map(user => [
+          user.id,
+          user
+        ])
+      );
+
+      // Combine ALL users with recommendation information
+      const combinedUsers = allData
+        .filter(user => user.role !== "admin")
+        .map(user => {
+          const recommendation =
+            recommendationMap.get(user.id);
+
+          return {
+  ...user,
+
+  ...(recommendation || {}),
+
+  teaches: recommendation?.teaches || [],
+  wants: recommendation?.wants || [],
+
+  match_score: recommendation?.match_score || 0,
+  recommend_score: recommendation?.recommend_score || 0,
+  barter_ready: recommendation?.barter_ready || false,
+
+  schedule: {
+    startTime: user.class_start_time || "",
+    endTime: user.class_end_time || "",
+    hoursPerDay: Number(user.hours_per_day) || 0,
+
+    availableDays: Array.isArray(user.available_days)
+      ? user.available_days
+      : typeof user.available_days === "string"
+        ? JSON.parse(user.available_days || "[]")
+        : []
+  }
+};
+        });
+
+      setTutors(combinedUsers);
+
+    } catch (err) {
+  console.error(err);
+
+  setError(
+    "Could not load tutors. Make sure server is running."
+  );
+
+  showToast?.(
+    "Could not load tutors. Make sure server is running.",
+    "error"
+  );
+
+} finally {
+      setLoading(false);
+    }
+  };
+
+  fetchTutors();
+}, []);
 
   const filtered = useMemo(() => {
     let list = tutors.filter(t => {
@@ -154,7 +211,14 @@ export default function ExplorePage({ navigate }) {
         t.university?.toLowerCase().includes(q) ||
         t.bio?.toLowerCase().includes(q);
       const matchOnline = !onlineOnly || t.is_online===1;
-      const matchMode   = filterMode==="all" || (filterMode==="barter"&&t.barter_ready) || (filterMode==="paid"&&!t.barter_ready);
+const matchMode =
+  filterMode === "all" ||
+  (filterMode === "barter" && t.barter_ready) ||
+  (
+    filterMode === "paid" &&
+    !t.barter_ready &&
+    (t.teaches || []).length > 0
+  );
       return matchSearch && matchOnline && matchMode;
     });
 
@@ -186,11 +250,11 @@ export default function ExplorePage({ navigate }) {
         {/* Header */}
         <div style={{marginBottom:24}}>
           <h1 style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:28,fontWeight:800,color:"#111827",marginBottom:4}}>Find Your Skill Match</h1>
-          <p style={{fontSize:14,color:"#6B7280"}}>{filtered.length} tutors · {barterCount} free barter matches · Ranked by AI recommendation</p>
-        </div>
-
-        {error && <div style={{padding:"12px 16px",background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:10,marginBottom:16}}><p style={{fontSize:13,color:"#DC2626"}}>⚠️ {error}</p></div>}
-
+          <p style={{fontSize:14,color:"#6B7280"}}>
+  {filtered.length} users · {barterCount} free barter matches · Skill matches ranked first
+</p>
+</div>
+       
         {/* Search */}
         <div style={{position:"relative",marginBottom:14}}>
           <svg style={{position:"absolute",left:16,top:"50%",transform:"translateY(-50%)"}} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2">
@@ -257,7 +321,13 @@ export default function ExplorePage({ navigate }) {
         )}
       </div>
 
-      {bookingTutor && <BookingModal tutor={bookingTutor} onClose={()=>setBookingTutor(null)}/>}
+      {bookingTutor && (
+  <BookingModal
+    tutor={bookingTutor}
+    onClose={() => setBookingTutor(null)}
+    showToast={showToast}
+  />
+)}
     </div>
   );
 }

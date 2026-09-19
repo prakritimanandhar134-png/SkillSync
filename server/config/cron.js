@@ -1,5 +1,5 @@
 const cron = require("node-cron");
-const db   = require("../config/db");
+const { pool } = require("../config/db");
 const { sendAutoRejectionEmail } = require("../config/email");
 
 // Runs every hour — checks for expired session requests
@@ -9,7 +9,7 @@ const startAutoRejectCron = () => {
 
     try {
       // Find all requested sessions that have passed expiry time
-      const [expired] = await db.query(`
+      const [expired] = await pool.query(`
         SELECT s.*,
                sk.name AS skill_name,
                st.full_name AS student_name, st.email AS student_email,
@@ -24,7 +24,7 @@ const startAutoRejectCron = () => {
 
       for (const session of expired) {
         // Update status to rejected
-      await db.query(
+      await pool.query(
   `UPDATE sessions
    SET status='rejected',
        rejection_reason=?

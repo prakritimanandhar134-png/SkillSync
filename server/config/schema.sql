@@ -2,8 +2,8 @@
 --  SkillSync Database Schema
 -- ─────────────────────────────────────────
 
-CREATE DATABASE IF NOT EXISTS project_db;
-USE project_db;
+CREATE DATABASE IF NOT EXISTS skillsync;
+USE skillsync;
 
 -- ── USERS ──────────────────────────────────
 CREATE TABLE IF NOT EXISTS users (
@@ -113,6 +113,22 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (sender_id)   REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- ── NOTIFICATIONS ──────────────────────────
+CREATE TABLE IF NOT EXISTS notifications (
+  id           INT AUTO_INCREMENT PRIMARY KEY,
+  user_id      INT NOT NULL,
+  type         VARCHAR(50) NOT NULL,
+  title        VARCHAR(255) NOT NULL,
+  message      TEXT NOT NULL,
+  reference_id INT NULL,
+  is_read      BOOLEAN DEFAULT FALSE,
+  created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (user_id)
+    REFERENCES users(id)
+    ON DELETE CASCADE
 );
 
 -- ── SEED: Default skills ───────────────────

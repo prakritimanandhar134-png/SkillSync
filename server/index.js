@@ -2,13 +2,14 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const path = require("path");
+const messagesRoute = require("./routes/messages");
 
 dotenv.config({ path: path.resolve(__dirname, ".env") });
 
 const app = express();
 
 app.use(cors({ origin: "http://localhost:5173", credentials: true }));
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 
 // Load routes one by one with error checking
 const authRoute     = require("./routes/auth");
@@ -19,6 +20,8 @@ const reviewsRoute  = require("./routes/reviews");
 const matchRoute    = require("./routes/match");
 const adminRoute    = require("./routes/admin");
 const checkAuthRoute = require("./routes/Checkauth");
+const notificationRoutes = require("./routes/notifications");
+
 
 console.log("auth type:",     typeof authRoute);
 console.log("users type:",    typeof usersRoute);
@@ -36,7 +39,8 @@ app.use("/api/sessions", sessionsRoute);
 app.use("/api/reviews",  reviewsRoute);
 app.use("/api/match",    matchRoute);
 app.use("/api/admin",    adminRoute);
-
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/messages", messagesRoute);
 
 app.use("/check", checkAuthRoute)
 
@@ -57,13 +61,12 @@ app.get("/api/test-email", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
+
 // Start auto-reject cron job
 const startAutoRejectCron = require("./config/cron");
-const router = require("./routes/auth");
 
 startAutoRejectCron();
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-
-  startAutoRejectCron();
 });

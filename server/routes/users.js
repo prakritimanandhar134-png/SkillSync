@@ -1,40 +1,74 @@
 const express = require("express");
 const router  = express.Router();
-const db      = require("../config/db");
+const { pool }   = require("../config/db");
 const { verifyToken } = require("../middleware/auth");
 
 // ── GET all users (public listing) ───────────
 // GET /api/users
 router.get("/", async (req, res) => {
   try {
-    const [users] = await db.query(`
-      SELECT u.id, u.full_name, u.email, u.university, u.year,
-             u.bio, u.avatar_url, u.skill_score, u.is_online,
-             ROUND(AVG(r.rating), 1) AS avg_rating,
-             COUNT(DISTINCT s.id)    AS session_count
+    const [users] = await pool.query(`
+      SELECT 
+        u.id,
+        u.full_name,
+        u.email,
+        u.university,
+        u.year,
+        u.bio,
+        u.location,
+        u.avatar_url,
+        u.skill_score,
+        u.is_online,
+
+        u.available_days,
+        u.class_start_time,
+        u.class_end_time,
+        u.hours_per_day,
+
+        ROUND(AVG(r.rating), 1) AS avg_rating,
+        COUNT(DISTINCT s.id) AS session_count
+
       FROM users u
-      LEFT JOIN sessions s ON s.tutor_id = u.id AND s.status = 'completed'
-      LEFT JOIN reviews  r ON r.reviewee_id = u.id
+
+      LEFT JOIN sessions s 
+        ON s.tutor_id = u.id 
+        AND s.status = 'completed'
+
+      LEFT JOIN reviews r 
+        ON r.reviewee_id = u.id
+
       WHERE u.role = 'user'
+
       GROUP BY u.id
+
       ORDER BY avg_rating DESC
     `);
+
     res.json(users);
+
   } catch (err) {
-    res.status(500).json({ message: "Server error." });
+    console.error("Get all users error:", err);
+
+    res.status(500).json({
+      message: "Server error."
+    });
   }
 });
-
 // ── GET single user profile ───────────────────
 // GET /api/users/:id
 router.get("/:id", async (req, res) => {
   try {
-    const [users] = await db.query(`
-      SELECT u.id, u.full_name, u.email, u.university, u.year,
-             u.bio, u.location, u.avatar_url, u.skill_score,
-             u.is_online, u.created_at,
-             ROUND(AVG(r.rating),1) AS avg_rating,
-             COUNT(DISTINCT s.id) AS session_count
+    const [users] = await pool.query(`
+       SELECT u.id, u.full_name, u.email, u.university, u.year,
+         u.bio, u.location, u.avatar_url, u.skill_score,
+         u.is_online,
+         u.created_at,
+         u.available_days,
+         u.class_start_time,
+         u.class_end_time,
+         u.hours_per_day,
+         ROUND(AVG(r.rating),1) AS avg_rating,
+         COUNT(DISTINCT s.id) AS session_count
       FROM users u
       LEFT JOIN sessions s
         ON s.tutor_id = u.id AND s.status='completed'
@@ -51,32 +85,33 @@ router.get("/:id", async (req, res) => {
     }
 
     // Skills they teach
-    const [teaches] = await db.query(`
-      SELECT
-        us.id,
-        us.level,
-        s.id AS skill_id,
-        s.name,
-        s.category
-      FROM user_skills us
-      JOIN skills s ON s.id = us.skill_id
-      WHERE us.user_id = ?
-      AND us.type = 'teach'
-    `, [req.params.id]);
+    const [teaches] = await pool.query(`
+  SELECT
+    ust.id,
+    ust.skill_id,
+    ust.proficiency AS level,
+    ust.proficiency,
+    ust.hourly_rate,
+    s.name,
+    s.category
+  FROM user_skills_teach ust
+  JOIN skills s
+    ON s.id = ust.skill_id
+  WHERE ust.user_id = ?
+`, [req.params.id]);
 
     // Skills they want to learn
-    const [wants] = await db.query(`
-      SELECT
-        us.id,
-        us.level,
-        s.id AS skill_id,
-        s.name,
-        s.category
-      FROM user_skills us
-      JOIN skills s ON s.id = us.skill_id
-      WHERE us.user_id = ?
-      AND us.type = 'learn'
-    `, [req.params.id]);
+    const [wants] = await pool.query(`
+  SELECT
+    usl.id,
+    usl.skill_id,
+    s.name,
+    s.category
+  FROM user_skills_learn usl
+  JOIN skills s
+    ON s.id = usl.skill_id
+  WHERE usl.user_id = ?
+`, [req.params.id]);
 
     res.json({
       ...users[0],
@@ -94,16 +129,68 @@ router.get("/:id", async (req, res) => {
   
 // ── UPDATE user profile ───────────────────────
 // PUT /api/users/profile
+// ── UPDATE user profile ───────────────────────
+// PUT /api/users/profile
 router.put("/profile", verifyToken, async (req, res) => {
-  const { full_name, university, year, bio, location } = req.body;
+  const {
+  full_name,
+  university,
+  year,
+  bio,
+  location,
+  available_days,
+  class_start_time,
+  class_end_time,
+  hours_per_day
+} = req.body;
+
   try {
-    await db.query(
-      "UPDATE users SET full_name=?, university=?, year=?, bio=?, location=? WHERE id=?",
-      [full_name, university, year, bio, location, req.user.id]
+    await pool.query(
+      `UPDATE users
+       SET full_name=?,
+           university=?,
+           year=?,
+           bio=?,
+           location=?,
+           available_days=?,
+           class_start_time = ?,
+  class_end_time = ?,
+  hours_per_day = ?
+       WHERE id=?`,
+      [
+        full_name,
+        university,
+        year,
+        bio,
+        location,
+        JSON.stringify(available_days || []),
+         class_start_time,
+  class_end_time,
+  hours_per_day,
+        req.user.id
+      ]
     );
-    res.json({ message: "Profile updated successfully." });
+
+    res.json({
+      message: "Profile updated successfully.",
+      user: {
+        full_name,
+        university,
+        year,
+        bio,
+        location,
+        available_days: available_days || [],
+       class_start_time,
+      class_end_time,
+  hours_per_day 
+      }
+    });
+
   } catch (err) {
-    res.status(500).json({ message: "Server error." });
+    console.error("Profile update error:", err);
+    res.status(500).json({
+      message: "Server error."
+    });
   }
 });
 
@@ -120,7 +207,7 @@ router.post("/avatar", verifyToken, async (req, res) => {
   const { avatar_url } = req.body;
 
   try {
-    await db.query(
+    await pool.query(
       "UPDATE users SET avatar_url = ? WHERE id = ?",
       [avatar_url, req.user.id]
     );
